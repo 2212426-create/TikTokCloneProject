@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/tiktok_black">
+
+    <com.google.android.exoplayer2.ui.StyledPlayerView
+        android:id="@+id/videoView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:use_controller="false"
+        app:resize_mode="fixed_width" />
+
+    <ProgressBar
+        android:id="@+id/pbLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/imv_appear"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_centerInParent="true"
+        android:visibility="gone"
+        android:alpha="0.8" />
+
+    <!-- UI Overlay (Avatar, Like, Comment, Description) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:orientation="vertical"
+        android:padding="15dp"
+        android:layout_marginEnd="60dp">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/tiktok_white"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:text="@string/username_label" />
+
+        <TextView
+            android:id="@+id/txvDescription"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/tiktok_white"
+            android:textSize="14sp"
+            android:layout_marginTop="5dp"
+            android:text="Description" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="80dp"
+        android:layout_marginEnd="10dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp">
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:id="@+id/imvAvatar"
+                android:layout_width="50dp"
+                android:layout_height="50dp"
+                android:src="@drawable/splash_background"
+                app:civ_border_width="1dp"
+                app:civ_border_color="@color/tiktok_white" />
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:src="@drawable/ic_baseline_video_library_24"
+                android:layout_alignBottom="@id/imvAvatar"
+                android:layout_centerHorizontal="true"
+                android:layout_marginBottom="-10dp" />
+        </RelativeLayout>
+
+        <TextView
+            android:id="@+id/tvFavorites"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/ic_favorite"
+            android:text="0"
+            android:textColor="@color/tiktok_white"
+            android:gravity="center"
+            android:layout_marginBottom="15dp" />
+
+        <TextView
+            android:id="@+id/tvComment"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:drawableTop="@drawable/ic_comment"
+            android:text="0"
+            android:textColor="@color/tiktok_white"
+            android:gravity="center"
+            android:layout_marginBottom="15dp" />
+
+        <ImageView
+            android:id="@+id/imvShare"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:src="@drawable/ic_share"
+            android:layout_marginBottom="15dp" />
+
+        <ImageView
+            android:id="@+id/imvVolume"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/ic_baseline_volume_up_24"
+            android:layout_marginBottom="15dp" />
+
+        <ImageView
+            android:id="@+id/imvMore"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:src="@drawable/ic_more"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/imvPause"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_centerInParent="true"
+        android:src="@drawable/ic_baseline_play_arrow_24"
+        android:visibility="gone"
+        android:alpha="0.5" />
+
+</RelativeLayout>

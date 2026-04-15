@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/tiktok_black"
+    tools:context=".activity.HomeScreenActivity">
+
+    <!-- Container cho các Fragment (Video, Search, Profile, v.v.) -->
+    <FrameLayout
+        android:id="@+id/main_fragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_above="@+id/bottom_navigation" />
+
+    <!-- Thanh tác vụ dưới cùng -->
+    <LinearLayout
+        android:id="@+id/bottom_navigation"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_alignParentBottom="true"
+        android:background="@color/tiktok_black"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp">
+
+        <Button
+            android:id="@+id/btnHome"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableTop="@drawable/ic_home"
+            android:text="@string/home"
+            android:textColor="@color/tiktok_white"
+            android:textSize="10sp" />
+
+        <Button
+            android:id="@+id/btnSearch"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableTop="@drawable/ic_search"
+            android:text="Search"
+            android:textColor="@color/tiktok_white"
+            android:textSize="10sp" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+            <Button
+                android:id="@+id/btnAddVideo"
+                android:layout_width="45dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:background="@drawable/btn_add_shape"
+                android:text="@string/ic_add"
+                android:textColor="@color/tiktok_black"
+                android:textSize="12sp"
+                android:gravity="center" />
+        </FrameLayout>
+
+        <Button
+            android:id="@+id/btnInbox"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableTop="@drawable/ic_inbox"
+            android:text="@string/inbox"
+            android:textColor="@color/tiktok_white"
+            android:textSize="10sp" />
+
+        <Button
+            android:id="@+id/btnProfile"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:drawableTop="@drawable/ic_profile"
+            android:text="@string/profile"
+            android:textColor="@color/tiktok_white"
+            android:textSize="10sp" />
+    </LinearLayout>
+
+</RelativeLayout>
