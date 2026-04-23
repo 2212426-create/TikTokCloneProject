@@ -16,14 +16,10 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
-import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 
@@ -60,19 +56,17 @@ public class EmailSignInActivity extends Activity {
         builder.setView(R.layout.dialog_progress);
         dialog = builder.create();
 
-        // Kiểm tra nếu đã login Google rồi thì dùng luôn, không bắt chọn lại
-        GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-        if (account != null) {
-            if (dialog != null) dialog.show();
-            handleSignIn(account);
-        } else {
-            signIn();
-        }
+        // Không tự động đăng nhập ở đây để tránh loop nếu có lỗi
+        // Thay vào đó, gọi trực tiếp hộp thoại chọn tài khoản Google
+        signIn();
     }
 
     private void signIn() {
-        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, RC_SIGN_IN);
+        // Sign out trước khi sign in để đảm bảo người dùng được chọn tài khoản
+        mGoogleSignInClient.signOut().addOnCompleteListener(task -> {
+            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+            startActivityForResult(signInIntent, RC_SIGN_IN);
+        });
     }
 
     @Override
@@ -86,68 +80,77 @@ public class EmailSignInActivity extends Activity {
                 if (dialog != null) dialog.show();
                 handleSignIn(account);
             } catch (ApiException e) {
-                Log.e(TAG, "Google sign in failed", e);
-                Toast.makeText(this, "Google Sign In Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                moveToAnotherActivity(SigninChoiceActivity.class);
+                Log.e(TAG, "Google sign in failed, code: " + e.getStatusCode(), e);
+                String errorMsg = "Google Sign In Failed. ";
+                if (e.getStatusCode() == 10) {
+                    errorMsg += "Please check SHA-1 in Firebase Console.";
+                } else if (e.getStatusCode() == 12500) {
+                    errorMsg += "Google Play Services error.";
+                } else {
+                    errorMsg += "Code: " + e.getStatusCode();
+                }
+                Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
+                
+                // Trả về màn hình cũ nhưng không dùng FLAG_ACTIVITY_CLEAR_TOP để tránh mất context
+                finish();
             }
         }
     }
 
     private void handleSignIn(GoogleSignInAccount account) {
-        Log.d(TAG, "Checking user in Firestore: " + account.getEmail());
-        
-        // Timeout check: Nếu sau 10s không thấy Firestore phản hồi, tự động thử đăng nhập Firebase luôn
-        db.collection("users").whereEqualTo("email", account.getEmail())
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        QuerySnapshot snapshots = task.getResult();
-                        if (snapshots != null && !snapshots.isEmpty()) {
-                            Log.d(TAG, "User exists, signing in...");
-                            firebaseAuthWithGoogle(account.getIdToken());
-                        } else {
-                            Log.d(TAG, "User does not exist, creating new profile...");
-                            createNewUser(account);
-                        }
-                    } else {
-                        // Lỗi Firestore (thường là do chưa bật API hoặc Permission)
-                        Log.e(TAG, "Firestore error: ", task.getException());
-                        // Dù lỗi Firestore vẫn cho phép Firebase Auth chạy để người dùng vào được app
-                        firebaseAuthWithGoogle(account.getIdToken());
-                    }
-                });
+        if (account == null) {
+            if (dialog != null) dialog.dismiss();
+            finish();
+            return;
+        }
+
+        // Ưu tiên đăng nhập Firebase Auth trước để người dùng vào được app nhanh nhất
+        firebaseAuthWithGoogle(account);
     }
 
-    private void createNewUser(GoogleSignInAccount account) {
-        Map<String, Object> user = new HashMap<>();
-        user.put("email", account.getEmail());
-        user.put("username", account.getDisplayName());
-        user.put("profileImageUrl", account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : "");
-        user.put("userId", account.getId());
-
-        db.collection("users").document(account.getId()).set(user)
-                .addOnCompleteListener(task -> firebaseAuthWithGoogle(account.getIdToken()));
-    }
-
-    private void firebaseAuthWithGoogle(String idToken) {
-        AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+    private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
+        AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
-                    if (dialog != null) dialog.dismiss();
                     if (task.isSuccessful()) {
-                        Toast.makeText(EmailSignInActivity.this, "Sign in successful", Toast.LENGTH_SHORT).show();
-                        moveToAnotherActivity(HomeScreenActivity.class);
+                        // Sau khi login Firebase thành công, mới kiểm tra/tạo profile trong Firestore
+                        checkAndSyncUserProfile(acct);
                     } else {
+                        if (dialog != null) dialog.dismiss();
                         Log.e(TAG, "Firebase Auth failed", task.getException());
-                        Toast.makeText(this, "Authentication Failed", Toast.LENGTH_SHORT).show();
-                        moveToAnotherActivity(SigninChoiceActivity.class);
+                        Toast.makeText(this, "Firebase Auth Failed: " + task.getException().getMessage(), Toast.LENGTH_LONG).show();
+                        finish();
                     }
                 });
     }
 
-    private void moveToAnotherActivity(Class<?> cls) {
-        Intent intent = new Intent(EmailSignInActivity.this, cls);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    private void checkAndSyncUserProfile(GoogleSignInAccount account) {
+        String uid = mAuth.getCurrentUser().getUid();
+        db.collection("profiles").document(uid).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null && !task.getResult().exists()) {
+                        // Nếu chưa có profile thì tạo mới
+                        Map<String, Object> profile = new HashMap<>();
+                        profile.put("userId", uid);
+                        profile.put("email", account.getEmail());
+                        profile.put("username", account.getDisplayName());
+                        profile.put("fullname", account.getDisplayName());
+                        profile.put("avatar", account.getPhotoUrl() != null ? account.getPhotoUrl().toString() : "");
+                        profile.put("bio", "Toptop user");
+                        
+                        db.collection("profiles").document(uid).set(profile)
+                                .addOnCompleteListener(t -> finishLogin());
+                    } else {
+                        finishLogin();
+                    }
+                });
+    }
+
+    private void finishLogin() {
+        if (dialog != null) dialog.dismiss();
+        Toast.makeText(EmailSignInActivity.this, "Sign in successful", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(EmailSignInActivity.this, HomeScreenActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
     }

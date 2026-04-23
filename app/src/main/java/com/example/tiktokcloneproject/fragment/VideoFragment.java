@@ -10,7 +10,6 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -22,7 +21,6 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
-import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
 
@@ -62,9 +60,8 @@ public class VideoFragment extends Fragment {
         db = FirebaseFirestore.getInstance();
 
         viewPager2 = layout.findViewById(R.id.viewPager);
-        progressBar = layout.findViewById(R.id.loadingGif); // Sử dụng ID cũ cho ProgressBar
+        progressBar = layout.findViewById(R.id.loadingGif);
         
-        // Nếu không tìm thấy ProgressBar theo ID cũ, tạo mới hoặc ẩn đi
         if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
 
         videos = new ArrayList<>();
@@ -76,11 +73,11 @@ public class VideoFragment extends Fragment {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                if (videoAdapter != null && position < videos.size()) {
+                if (videoAdapter != null) {
                     videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
+                    videoAdapter.updateCurrentPosition(position);
                     videoAdapter.playVideo(position);
                     videoAdapter.updateWatchCount(position);
-                    videoAdapter.updateCurrentPosition(position);
                 }
             }
         });
@@ -91,33 +88,19 @@ public class VideoFragment extends Fragment {
 
     public void pauseVideo() {
         if (videoAdapter != null) {
-            int currentPosition = videoAdapter.getCurrentPosition();
-            Context ctx = context != null ? context : getActivity();
-            if (ctx != null) {
-                SharedPreferences currentPosPref = ctx.getSharedPreferences("position", Context.MODE_PRIVATE);
-                currentPosPref.edit().putInt("position", currentPosition).apply();
-            }
-            videoAdapter.pauseVideo(currentPosition);
+            videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
         }
     }
 
     public void continueVideo() {
         if (videoAdapter != null) {
-            Context ctx = context != null ? context : getActivity();
-            if (ctx != null) {
-                SharedPreferences currentPosPref = ctx.getSharedPreferences("position", Context.MODE_PRIVATE);
-                int currentPosition = currentPosPref.getInt("position", -1);
-                if (currentPosition != -1 && currentPosition < videos.size()) {
-                    videoAdapter.playVideo(currentPosition);
-                }
-            }
+            videoAdapter.playVideo(videoAdapter.getCurrentPosition());
         }
     }
 
     private void loadVideos() {
         if (db == null) return;
         
-        // Lấy 10 video mới nhất để giảm lag khi khởi động
         videoListener = db.collection("videos")
                 .limit(10)
                 .addSnapshotListener((snapshots, e) -> {
@@ -130,17 +113,36 @@ public class VideoFragment extends Fragment {
                     if (snapshots != null) {
                         if (progressBar != null) progressBar.setVisibility(View.GONE);
                         
+                        boolean isFirstLoad = videos.isEmpty();
+                        
                         for (DocumentChange dc : snapshots.getDocumentChanges()) {
                             if (dc.getType() == DocumentChange.Type.ADDED) {
                                 Video video = dc.getDocument().toObject(Video.class);
-                                if (videoAdapter != null) {
-                                    videos.add(video);
-                                    videoAdapter.notifyItemInserted(videos.size() - 1);
-                                }
+                                videos.add(video);
+                                videoAdapter.notifyItemInserted(videos.size() - 1);
                             }
+                        }
+                        
+                        // Nếu là lần đầu load, tự động play video đầu tiên sau khi adapter cập nhật
+                        if (isFirstLoad && !videos.isEmpty()) {
+                            viewPager2.post(() -> {
+                                if (videoAdapter != null) videoAdapter.playVideo(0);
+                            });
                         }
                     }
                 });
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        continueVideo();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        pauseVideo();
     }
 
     @Override

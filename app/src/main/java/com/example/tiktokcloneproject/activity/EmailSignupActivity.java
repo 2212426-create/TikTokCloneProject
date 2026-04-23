@@ -1,16 +1,11 @@
 package com.example.tiktokcloneproject.activity;
 
-import androidx.annotation.NonNull;
-
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import com.example.tiktokcloneproject.R;
@@ -21,21 +16,17 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
-import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class EmailSignupActivity extends Activity{
+public class EmailSignupActivity extends Activity {
 
     private static final String TAG = "EmailSignUpActivity";
     private static final int RC_SIGN_IN = 9001;
@@ -48,7 +39,7 @@ public class EmailSignupActivity extends Activity{
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_email_signup); // Mở lại giao diện
+        setContentView(R.layout.activity_email_signin); 
 
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
@@ -65,19 +56,10 @@ public class EmailSignupActivity extends Activity{
         builder.setView(R.layout.dialog_progress);
         dialog = builder.create();
 
-        // Kiểm tra session cũ
-        GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
-        if (account != null) {
-            if (dialog != null) dialog.show();
-            handleSignUp(account);
-        } else {
-            signUp();
-        }
-    }
-
-    private void signUp() {
-        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-        startActivityForResult(signInIntent, RC_SIGN_IN);
+        mGoogleSignInClient.signOut().addOnCompleteListener(task -> {
+            Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+            startActivityForResult(signInIntent, RC_SIGN_IN);
+        });
     }
 
     @Override
@@ -89,40 +71,17 @@ public class EmailSignupActivity extends Activity{
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
                 if (dialog != null) dialog.show();
-                handleSignUp(account);
+                firebaseAuthWithGoogle(account);
             } catch (ApiException e) {
-                Log.e(TAG, "Google sign in failed", e);
-                Toast.makeText(this, "Sign up failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                moveToAnotherActivity(SignupChoiceActivity.class);
+                Log.e(TAG, "Google sign in failed: " + e.getStatusCode());
+                Toast.makeText(this, "Sign up failed (Code: " + e.getStatusCode() + ")", Toast.LENGTH_SHORT).show();
+                finish();
             }
         }
     }
 
-    private void handleSignUp(GoogleSignInAccount account) {
-        db.collection("users")
-                .whereEqualTo("email", account.getEmail())
-                .get().addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        QuerySnapshot snapshots = task.getResult();
-                        if (snapshots != null && !snapshots.isEmpty()) {
-                            // Email đã tồn tại -> Chuyển sang đăng nhập
-                            if (dialog != null) dialog.dismiss();
-                            Toast.makeText(this, "Email already registered. Signing you in...", Toast.LENGTH_SHORT).show();
-                            firebaseAuthWithGoogle(account.getIdToken());
-                        } else {
-                            // Email mới -> Đăng ký
-                            firebaseAuthWithGoogle(account.getIdToken());
-                        }
-                    } else {
-                        Log.e(TAG, "Firestore error during signup check", task.getException());
-                        // Nếu Firestore lỗi, vẫn thử Auth để tránh treo màn hình
-                        firebaseAuthWithGoogle(account.getIdToken());
-                    }
-                });
-    }
-
-    private void firebaseAuthWithGoogle(String idToken) {
-        AuthCredential credential = GoogleAuthProvider.getCredential(idToken, null);
+    private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
+        AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
@@ -134,39 +93,25 @@ public class EmailSignupActivity extends Activity{
                                 username = "user_" + id.substring(0, 5);
                             }
                             
+                            // Tạo user và profile đồng thời
                             User user = new User(id, username, "", firebaseUser.getEmail());
-                            writeNewUser(user);
+                            db.collection("users").document(id).set(user.toMap());
+                            
                             Profile profile = new Profile(id, username);
-                            writeNewProfile(profile);
+                            db.collection("profiles").document(id).set(profile.toMap())
+                                    .addOnCompleteListener(t -> {
+                                        if (dialog != null) dialog.dismiss();
+                                        Intent intent = new Intent(EmailSignupActivity.this, HomeScreenActivity.class);
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                        startActivity(intent);
+                                        finish();
+                                    });
                         }
-                        if (dialog != null) dialog.dismiss();
-                        moveToAnotherActivity(HomeScreenActivity.class);
                     } else {
                         if (dialog != null) dialog.dismiss();
-                        Log.e(TAG, "Firebase Auth failed", task.getException());
-                        moveToAnotherActivity(SignupChoiceActivity.class);
+                        Toast.makeText(this, "Auth Failed", Toast.LENGTH_SHORT).show();
+                        finish();
                     }
                 });
-    }
-
-    private void writeNewUser(User user) {
-        db.collection("users").document(user.getUserId()).set(user.toMap());
-    }
-
-    private void writeNewProfile(Profile profile) {
-        db.collection("profiles").document(profile.getUserId()).set(profile.toMap());
-        
-        // Tạo các collection con mặc định
-        Map<String, Object> dump = new HashMap<>();
-        dump.put("init", true);
-        db.collection("profiles").document(profile.getUserId()).collection("following").document("dump").set(dump);
-        db.collection("profiles").document(profile.getUserId()).collection("followers").document("dump").set(dump);
-    }
-
-    private void moveToAnotherActivity(Class<?> cls) {
-        Intent intent = new Intent(EmailSignupActivity.this, cls);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(intent);
-        finish();
     }
 }

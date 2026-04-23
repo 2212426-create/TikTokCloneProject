@@ -145,9 +145,13 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                     startPreview();
                 }
                 @Override
-                public void onDisconnected(@NonNull CameraDevice camera) { closeCamera(); }
+                public void onDisconnected(@NonNull CameraDevice camera) { 
+                    closeCamera();
+                }
                 @Override
-                public void onError(@NonNull CameraDevice camera, int error) { closeCamera(); }
+                public void onError(@NonNull CameraDevice camera, int error) { 
+                    closeCamera();
+                }
             }, backgroundHandler);
         } catch (CameraAccessException e) { e.printStackTrace(); }
     }
@@ -164,6 +168,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             mainCamera.createCaptureSession(Collections.singletonList(surface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    if (mainCamera == null) return;
                     mainCaptureSession = session;
                     try {
                         session.setRepeatingRequest(captureRequestBuilder.build(), null, backgroundHandler);
@@ -172,13 +177,13 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {}
             }, backgroundHandler);
-        } catch (CameraAccessException e) { e.printStackTrace(); }
+        } catch (CameraAccessException | IllegalStateException e) { e.printStackTrace(); }
     }
 
     private void startRecording() {
         if (mainCamera == null) return;
         try {
-            closeCaptureSession(); // Đóng session cũ trước khi tạo session mới để tránh crash
+            closeCaptureSession(); 
             videoFileHolder = createVideoFileName();
             mediaRecorder = new MediaRecorder();
             setupMediaRecorder();
@@ -195,6 +200,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
             mainCamera.createCaptureSession(Arrays.asList(previewSurface, recordSurface), new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    if (mainCamera == null) return;
                     mainCaptureSession = session;
                     try {
                         session.setRepeatingRequest(captureRequestBuilder.build(), null, backgroundHandler);
@@ -205,7 +211,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
                                 updateUI(true);
                             } catch (Exception e) { Log.e(TAG, "mediaRecorder start fail", e); }
                         });
-                    } catch (CameraAccessException e) { e.printStackTrace(); }
+                    } catch (CameraAccessException | IllegalStateException e) { e.printStackTrace(); }
                 }
                 @Override
                 public void onConfigureFailed(@NonNull CameraCaptureSession session) {}
@@ -235,6 +241,10 @@ public class CameraActivity extends Activity implements View.OnClickListener {
 
     private void closeCaptureSession() {
         if (mainCaptureSession != null) {
+            try {
+                mainCaptureSession.stopRepeating();
+                mainCaptureSession.abortCaptures();
+            } catch (Exception ignored) {}
             mainCaptureSession.close();
             mainCaptureSession = null;
         }
