@@ -86,7 +86,7 @@ public class NavigationFragment extends Fragment implements View.OnClickListener
         });
 
         btnHome.setOnClickListener(this);
-        btnFriend.setOnClickListener(this);
+        // btnFriend.setOnClickListener(this); // btnFriend is not used
         btnAddVideo.setOnClickListener(this);
         btnInbox.setOnClickListener(this);
         btnProfile.setOnClickListener(this);
@@ -107,9 +107,9 @@ public class NavigationFragment extends Fragment implements View.OnClickListener
         if(view.getId() == btnInbox.getId()) {
             handleInboxClick();
         }
-        if(view.getId() == btnFriend.getId()) {
-
-        }
+        // btnFriend is not used
+        // if(view.getId() == btnFriend.getId()) {
+        // }
 
     }
 

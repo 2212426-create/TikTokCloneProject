@@ -1,6 +1,9 @@
 package com.example.tiktokcloneproject.activity;
 
-import android.app.Activity;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
+
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Intent;
@@ -26,15 +29,33 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
-public class EmailSignupActivity extends Activity {
+public class EmailSignupActivity extends AppCompatActivity {
 
     private static final String TAG = "EmailSignUpActivity";
-    private static final int RC_SIGN_IN = 9001;
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
     private GoogleSignInClient mGoogleSignInClient;
     private Dialog dialog;
+    private final ActivityResultLauncher<Intent> googleSignInLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                Intent data = result.getData();
+                if (data == null) {
+                    if (dialog != null) dialog.dismiss();
+                    finish();
+                    return;
+                }
+                Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+                try {
+                    GoogleSignInAccount account = task.getResult(ApiException.class);
+                    if (dialog != null) dialog.show();
+                    firebaseAuthWithGoogle(account);
+                } catch (ApiException e) {
+                    Log.e(TAG, "Google sign in failed: " + e.getStatusCode());
+                    Toast.makeText(this, "Sign up failed (Code: " + e.getStatusCode() + ")", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,26 +79,8 @@ public class EmailSignupActivity extends Activity {
 
         mGoogleSignInClient.signOut().addOnCompleteListener(task -> {
             Intent signInIntent = mGoogleSignInClient.getSignInIntent();
-            startActivityForResult(signInIntent, RC_SIGN_IN);
+            googleSignInLauncher.launch(signInIntent);
         });
-    }
-
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == RC_SIGN_IN) {
-            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
-            try {
-                GoogleSignInAccount account = task.getResult(ApiException.class);
-                if (dialog != null) dialog.show();
-                firebaseAuthWithGoogle(account);
-            } catch (ApiException e) {
-                Log.e(TAG, "Google sign in failed: " + e.getStatusCode());
-                Toast.makeText(this, "Sign up failed (Code: " + e.getStatusCode() + ")", Toast.LENGTH_SHORT).show();
-                finish();
-            }
-        }
     }
 
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {

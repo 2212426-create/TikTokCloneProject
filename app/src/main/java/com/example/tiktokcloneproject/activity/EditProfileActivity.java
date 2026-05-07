@@ -1,6 +1,5 @@
 package com.example.tiktokcloneproject.activity;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
@@ -15,8 +14,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.tiktokcloneproject.R;
 import com.example.tiktokcloneproject.helper.StaticVariable;
@@ -33,17 +34,24 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
-public class EditProfileActivity extends Activity implements View.OnClickListener {
+public class EditProfileActivity extends AppCompatActivity implements View.OnClickListener {
     private TextView tvUsername, tvPhone, tvEmail, tvBirthdate;
     private ImageButton imbPhoto, imbSelect, imbUsername, imbBirthdate;
     private LinearLayout llEditProfile, llChangePhoto, llPhone, llEmail;
     private FirebaseFirestore db;
     private Uri avatarUri;
-    private final int SELECT_IMAGE_CODE = 10;
     private ImageView imvBackToProfile;
     private Dialog dialog;
     private FirebaseStorage storage;
     private StorageReference storageReference;
+    private final ActivityResultLauncher<Intent> pickImageLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() == RESULT_OK && data != null && data.getData() != null) {
+                    avatarUri = data.getData();
+                    uploadAvatar();
+                }
+            });
 
     private final String TAG = "EditProfileActivity";
     FirebaseUser user;
@@ -72,11 +80,11 @@ public class EditProfileActivity extends Activity implements View.OnClickListene
 
         if (imbSelect != null) imbSelect.setVisibility(View.GONE);
 
-        imbPhoto.setOnClickListener(this);
+        if (imbPhoto != null) imbPhoto.setOnClickListener(this);
         if (imbSelect != null) imbSelect.setOnClickListener(this);
-        imvBackToProfile.setOnClickListener(this);
-        imbUsername.setOnClickListener(this);
-        imbBirthdate.setOnClickListener(this);
+        if (imvBackToProfile != null) imvBackToProfile.setOnClickListener(this);
+        if (imbUsername != null) imbUsername.setOnClickListener(this);
+        if (imbBirthdate != null) imbBirthdate.setOnClickListener(this);
 
         db = FirebaseFirestore.getInstance();
         user = FirebaseAuth.getInstance().getCurrentUser();
@@ -129,16 +137,17 @@ public class EditProfileActivity extends Activity implements View.OnClickListene
         return data == null ? "" : data.toString();
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == SELECT_IMAGE_CODE && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            avatarUri = data.getData();
-            uploadAvatar();
-        }
-    }
-
     private void uploadAvatar() {
+        if (user == null) {
+            Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (avatarUri == null) {
+            Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         ProgressDialog progress = new ProgressDialog(this);
         progress.setMessage("Uploading...");
         progress.setCancelable(false);
@@ -148,27 +157,34 @@ public class EditProfileActivity extends Activity implements View.OnClickListene
         upload.putFile(avatarUri)
                 .addOnSuccessListener(taskSnapshot -> {
                     progress.dismiss();
-                    Toast.makeText(this, "Image Uploaded", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(EditProfileActivity.this, "Avatar uploaded successfully", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "Avatar uploaded successfully");
                 })
                 .addOnFailureListener(e -> {
                     progress.dismiss();
-                    Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Avatar upload failed", e);
+                    Toast.makeText(EditProfileActivity.this, "Upload failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 
     @Override
     public void onClick(View v) {
+        if (v == null) return;
         int id = v.getId();
         if (id == R.id.imbPhoto) {
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
             intent.setType("image/*");
-            startActivityForResult(Intent.createChooser(intent, "Select Photo"), SELECT_IMAGE_CODE);
+            pickImageLauncher.launch(Intent.createChooser(intent, "Select Photo"));
         } else if (id == R.id.imvBackToProfile) {
             finish();
         } else if (id == R.id.imbUsername) {
-            moveToEdit(StaticVariable.USERNAME, tvUsername.getText().toString());
+            if (tvUsername != null) {
+                moveToEdit(StaticVariable.USERNAME, tvUsername.getText().toString());
+            }
         } else if (id == R.id.imbBirthdate) {
-            moveToEdit(StaticVariable.BIRTHDATE, tvBirthdate.getText().toString());
+            if (tvBirthdate != null) {
+                moveToEdit(StaticVariable.BIRTHDATE, tvBirthdate.getText().toString());
+            }
         }
     }
 

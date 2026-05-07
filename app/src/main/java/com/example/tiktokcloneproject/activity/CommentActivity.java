@@ -11,6 +11,7 @@ import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -72,7 +73,7 @@ public class CommentActivity extends Activity implements View.OnClickListener{
     int totalComments;
     CommentAdapter adapter;
 
-    Handler handler = new Handler();
+    Handler handler = new Handler(Looper.getMainLooper());
 
     ArrayList<Comment> comments;
 

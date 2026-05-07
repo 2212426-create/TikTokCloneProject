@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentTransaction;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -31,7 +32,7 @@ public class ChangePasswordActivity extends FragmentActivity implements View.OnC
     FirebaseFirestore db;
     FirebaseAuth mAuth;
     FirebaseUser user;
-    Handler handler = new Handler();
+    Handler handler = new Handler(Looper.getMainLooper());
     String phone;
     String password;
     String msg;
@@ -61,6 +62,11 @@ public class ChangePasswordActivity extends FragmentActivity implements View.OnC
         db = FirebaseFirestore.getInstance();
         mAuth = FirebaseAuth.getInstance();
         user = mAuth.getCurrentUser();
+        if (user == null) {
+            Toast.makeText(this, getString(R.string.error_verify), Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
 
         fm = getSupportFragmentManager();
 
@@ -94,7 +100,11 @@ public class ChangePasswordActivity extends FragmentActivity implements View.OnC
             if (password.isEmpty() || !validator.isValidPassword(password)) {
                 Toast.makeText(ChangePasswordActivity.this, getString(R.string.error_Password), Toast.LENGTH_SHORT).show();
             } else {
-                phone = user.getPhoneNumber().toString();
+                phone = user.getPhoneNumber();
+                if (phone == null || phone.isEmpty()) {
+                    Toast.makeText(this, getString(R.string.error_change_password_not_supported), Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 db.collection("users")
                         .whereEqualTo("phone", phone)
@@ -118,7 +128,7 @@ public class ChangePasswordActivity extends FragmentActivity implements View.OnC
                                 setVisibleVisibility(llNewPassword.getId());
                             } else {
                                 addShowHideListener(fragmentWaiting);
-                                Toast.makeText(this, getString(R.string.error_signin), Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, getString(R.string.error_old_password), Toast.LENGTH_SHORT).show();
                             }
                         });
                 addShowHideListener(fragmentWaiting);

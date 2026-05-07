@@ -129,7 +129,19 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.userItems> imp
 
             @Override
             protected void publishResults(CharSequence charSequence, FilterResults filterResults) {
-                listUser= (List<User>) filterResults.values;
+                Object values = filterResults.values;
+                if (values instanceof List<?>) {
+                    List<?> rawList = (List<?>) values;
+                    List<User> filteredUsers = new ArrayList<>();
+                    for (Object item : rawList) {
+                        if (item instanceof User) {
+                            filteredUsers.add((User) item);
+                        }
+                    }
+                    listUser = filteredUsers;
+                } else {
+                    listUser = new ArrayList<>();
+                }
                 notifyDataSetChanged();
             }
         };
