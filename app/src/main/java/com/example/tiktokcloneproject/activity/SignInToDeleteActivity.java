@@ -27,7 +27,7 @@ public class SignInToDeleteActivity extends AppCompatActivity {
         btnSignInAgain.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent intent = new Intent(SignInToDeleteActivity.this, PhoneSigninActivity.class);
+                Intent intent = new Intent(SignInToDeleteActivity.this, EmailSignInActivity.class);
                 startActivity(intent);
             }
         });

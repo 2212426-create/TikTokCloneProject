@@ -152,18 +152,34 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
 
         if (user != null) {
             currentUserID = user.getUid();
-            setLikes(currentUserID);
         }
 
         if (userId != null && !userId.isEmpty()) {
+            setLikes(userId);
             docRef = db.collection("profiles").document(userId);
             if (user != null && userId.equals(user.getUid())) {
+                // Vào profile của mình
                 if (btnEditProfile != null) {
                     btnEditProfile.setVisibility(View.VISIBLE);
                     btnEditProfile.setOnClickListener(this);
                 }
-                if (edtBio != null) edtBio.setVisibility(View.VISIBLE);
+                if (edtBio != null) {
+                    edtBio.setVisibility(View.VISIBLE);
+                    edtBio.setOnFocusChangeListener((view, hasFocus) -> {
+                        View layoutBio = layout.findViewById(R.id.layout_bio);
+                        if (layoutBio != null) {
+                            layoutBio.setVisibility(hasFocus ? View.VISIBLE : View.GONE);
+                        }
+                    });
+                }
+                loadUserBio();
             } else {
+                // Vào profile người khác - hiển thị bio dạng read-only
+                if (edtBio != null) {
+                    edtBio.setVisibility(View.VISIBLE);
+                    edtBio.setEnabled(false);
+                    edtBio.setFocusable(false);
+                }
                 handleFollow();
             }
         }
@@ -257,11 +273,29 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                         if (txvLikes != null)
                             txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
                         if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
-                        oldBioText = document.getString("bio");
-                        if (edtBio != null) edtBio.setText(oldBioText);
+                        // Load bio cho cả 2 trường hợp: profile mình và người khác
+                        String bio = document.getString("bio");
+                        if (bio != null && edtBio != null) {
+                            oldBioText = bio;
+                            edtBio.setText(bio);
+                        }
                     }
                 }
             });
+        }
+    }
+
+    private void loadUserBio() {
+        if (docRef != null) {
+            docRef.get().addOnSuccessListener(document -> {
+                if (isAdded() && document.exists() && edtBio != null) {
+                    String bio = document.getString("bio");
+                    if (bio != null) {
+                        oldBioText = bio;
+                        edtBio.setText(bio);
+                    }
+                }
+            }).addOnFailureListener(e -> Log.e(TAG, "Error loading bio", e));
         }
     }
 
@@ -291,8 +325,20 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
 
     void updateBio() {
         if (docRef != null && edtBio != null) {
-            docRef.update("bio", edtBio.getText().toString());
-            oldBioText = edtBio.getText().toString();
+            String newBio = edtBio.getText().toString();
+            docRef.update("bio", newBio)
+                    .addOnSuccessListener(aVoid -> {
+                        oldBioText = newBio;
+                        if (context != null) {
+                            Toast.makeText(context, "Bio updated successfully", Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        if (context != null) {
+                            Toast.makeText(context, "Failed to update bio", Toast.LENGTH_SHORT).show();
+                        }
+                        Log.e(TAG, "Error updating bio", e);
+                    });
         }
     }
 
@@ -375,7 +421,13 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             db.collection("profiles").document(currentUserID).collection("following").document(userId).set(data)
                     .addOnSuccessListener(aVoid -> {
                         db.collection("profiles").document(currentUserID).update("following", FieldValue.increment(1));
-                        handleFollowed();
+                        Map<String, Object> followerData = new HashMap<>();
+                        followerData.put("userID", currentUserID);
+                        db.collection("profiles").document(userId).collection("followers").document(currentUserID).set(followerData)
+                                .addOnSuccessListener(v -> {
+                                    db.collection("profiles").document(userId).update("followers", FieldValue.increment(1));
+                                    handleFollowed();
+                                });
                     });
         });
     }
@@ -388,7 +440,11 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             db.collection("profiles").document(currentUserID).collection("following").document(userId).delete()
                     .addOnSuccessListener(aVoid -> {
                         db.collection("profiles").document(currentUserID).update("following", FieldValue.increment(-1));
-                        handleUnfollowed();
+                        db.collection("profiles").document(userId).collection("followers").document(currentUserID).delete()
+                                .addOnSuccessListener(v -> {
+                                    db.collection("profiles").document(userId).update("followers", FieldValue.increment(-1));
+                                    handleUnfollowed();
+                                });
                     });
         });
     }
@@ -416,7 +472,17 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                 for (QueryDocumentSnapshot document : task.getResult()) {
                     userVideos.add(document.getString("videoId"));
                 }
-                if (txvLikes != null) txvLikes.setText(String.valueOf(totalLikes));
+                db.collection("likes").get().addOnCompleteListener(likesTask -> {
+                    if (isAdded() && likesTask.isSuccessful() && likesTask.getResult() != null) {
+                        totalLikes = 0;
+                        for (QueryDocumentSnapshot document : likesTask.getResult()) {
+                            if (userVideos.contains(document.getId())) {
+                                totalLikes += document.getData().size();
+                            }
+                        }
+                        if (txvLikes != null) txvLikes.setText(String.valueOf(totalLikes));
+                    }
+                });
             }
         });
     }

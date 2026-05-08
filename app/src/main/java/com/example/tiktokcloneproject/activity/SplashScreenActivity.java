@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 public class SplashScreenActivity extends Activity {
@@ -16,7 +17,7 @@ public class SplashScreenActivity extends Activity {
         // Có thể set layout nếu có file res/layout/activity_splash_screen.xml
         // setContentView(R.layout.activity_splash_screen);
 
-        new Handler().postDelayed(new Runnable(){
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable(){
             @Override
             public void run() {
                 try {

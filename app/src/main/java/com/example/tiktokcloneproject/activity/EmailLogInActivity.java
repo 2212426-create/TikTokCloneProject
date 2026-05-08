@@ -65,6 +65,7 @@ public class EmailLogInActivity extends AppCompatActivity {
                             "Please enter email!!",
                             Toast.LENGTH_LONG)
                     .show();
+            progressbar.setVisibility(View.GONE);
             return;
         }
 
@@ -73,6 +74,7 @@ public class EmailLogInActivity extends AppCompatActivity {
                             "Please enter password!!",
                             Toast.LENGTH_LONG)
                     .show();
+            progressbar.setVisibility(View.GONE);
             return;
         }
 

@@ -1,7 +1,6 @@
 package com.example.tiktokcloneproject.activity;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.SurfaceTexture;
@@ -31,9 +30,12 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import com.example.tiktokcloneproject.R;
@@ -50,7 +52,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 
-public class CameraActivity extends Activity implements View.OnClickListener {
+public class CameraActivity extends AppCompatActivity implements View.OnClickListener {
     private final String TAG = "CameraActivity";
     CameraManager manager;
     FrameLayout cameraFrameLayout;
@@ -74,6 +76,13 @@ public class CameraActivity extends Activity implements View.OnClickListener {
     private HandlerThread backgroundHandlerThread;
     private Handler backgroundHandler;
     CaptureRequest.Builder captureRequestBuilder;
+    private final ActivityResultLauncher<Intent> pickVideoLauncher =
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                Intent data = result.getData();
+                if (result.getResultCode() == RESULT_OK && data != null && data.getData() != null) {
+                    startUploadingActivity(data.getData());
+                }
+            });
 
     private TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
@@ -270,7 +279,7 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         } else if (id == R.id.btnUploadVideo) {
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
             intent.setType("video/*");
-            startActivityForResult(intent, 5);
+            pickVideoLauncher.launch(intent);
         } else if (id == R.id.button_close) finish();
     }
 
@@ -343,11 +352,4 @@ public class CameraActivity extends Activity implements View.OnClickListener {
         startActivity(i);
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 5 && resultCode == RESULT_OK && data != null) {
-            startUploadingActivity(data.getData());
-        }
-    }
 }

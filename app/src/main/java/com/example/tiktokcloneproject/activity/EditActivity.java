@@ -2,6 +2,7 @@ package com.example.tiktokcloneproject.activity;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.app.Activity;
 import android.app.DatePickerDialog;
@@ -9,6 +10,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -53,7 +55,7 @@ public class EditActivity extends Activity implements View.OnClickListener {
     FirebaseUser user;
 
     final String TAG = "EditActivity";
-    Handler handler = new Handler();
+    Handler handler = new Handler(Looper.getMainLooper());
     String msg;
     final Calendar myCalendar= Calendar.getInstance();
 
@@ -106,25 +108,25 @@ public class EditActivity extends Activity implements View.OnClickListener {
         }
 
         if(view.getId() == btnSave.getId()) {
-            DocumentReference userDoc = db.collection("users").document(user.getUid());
+            if (user == null) {
+                Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            String inputValue = edtInput.getText().toString();
+
+            if (inputValue.isEmpty()) {
+                Toast.makeText(this, "Input cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
             setEnableSave(false);
-            userDoc.update(mode, edtInput.getText().toString())
-                    .addOnSuccessListener(new OnSuccessListener<Void>() {
-                        @Override
-                        public void onSuccess(Void aVoid) {
-                            Log.d(TAG, "DocumentSnapshot successfully updated!");
-                            setEnableSave(false);
-                        }
-
-
-                    })
-                    .addOnFailureListener(new OnFailureListener() {
-                        @Override
-                        public void onFailure(@NonNull Exception e) {
-                            Log.w(TAG, "Error updating document", e);
-                        }
-                    });
+            
+            if (StaticVariable.USERNAME.equals(mode)) {
+                checkUsernameAvailability(inputValue);
+            } else if (StaticVariable.BIRTHDATE.equals(mode)) {
+                updateBirthdate(inputValue);
+            }
         }
 
 
@@ -157,37 +159,6 @@ public class EditActivity extends Activity implements View.OnClickListener {
                         setEnableSave(true);
                     }
                 }
-            }
-        });
-
-        btnSave.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                db.collection("users")
-                        .whereEqualTo("username", edtInput.getText().toString())
-                        .get()
-                        .addOnCompleteListener(task -> {
-                            msg = "FALSE";
-                            if (task.isSuccessful()) {
-                                for (DocumentSnapshot document : task.getResult()) {
-                                    if (document.exists()) {
-                                        msg = "TRUE";
-                                        break;
-                                    }
-                                }
-
-                            } else {
-                                Log.d(TAG, "Error getting documents: ", task.getException());
-                            }
-
-                            if (msg.equals("FALSE")) {
-                                setEnableSave(false);
-                                handler.post(EditActivity.this::updateUsername);
-                            } else {
-                                setEnableSave(false);
-                                layoutInput.setError(getString(R.string.exist_username));
-                            }
-                        });
             }
         });
     }
@@ -247,10 +218,10 @@ public class EditActivity extends Activity implements View.OnClickListener {
     private void setEnableSave(boolean value) {
         if(value) {
             btnSave.setEnabled(true);
-            btnSave.setTextColor(getResources().getColor(R.color.tiktok_red));
+            btnSave.setTextColor(ContextCompat.getColor(this, R.color.tiktok_red));
         } else {
             btnSave.setEnabled(false);
-            btnSave.setTextColor(getResources().getColor(R.color.tiktok_grey_50));
+            btnSave.setTextColor(ContextCompat.getColor(this, R.color.tiktok_grey_50));
         }
     }
 
@@ -261,30 +232,101 @@ public class EditActivity extends Activity implements View.OnClickListener {
         DocumentReference profileDoc = db.collection("profiles").document(user.getUid());
 
         userDoc.update("username", username)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Log.d(TAG, "DocumentSnapshot successfully updated!");
-                    }
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "User username updated"))
+                .addOnFailureListener(e -> Log.e(TAG, "Error updating user username", e));
+        
+        profileDoc.update("username", username)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Profile username updated");
+                    Toast.makeText(EditActivity.this, "Username updated successfully", Toast.LENGTH_SHORT).show();
+                    handler.postDelayed(() -> {
+                        Intent intent = new Intent(EditActivity.this, EditProfileActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }, 500);
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.w(TAG, "Error updating document", e);
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating profile username", e);
+                    Toast.makeText(EditActivity.this, "Failed to update profile", Toast.LENGTH_SHORT).show();
+                    setEnableSave(true);
+                });
+    }
+
+    private void updateProfileUsername(String username) {
+        DocumentReference profileDoc = db.collection("profiles").document(user.getUid());
+        profileDoc.update("username", username)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Profile username updated");
+                    handler.postDelayed(() -> {
+                        Intent intent = new Intent(EditActivity.this, EditProfileActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }, 500);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating profile username", e);
+                    Toast.makeText(EditActivity.this, "Failed to update profile", Toast.LENGTH_SHORT).show();
+                    setEnableSave(true);
+                });
+    }
+
+    private void checkUsernameAvailability(String username) {
+        db.collection("users")
+                .whereEqualTo("username", username)
+                .get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        boolean isTaken = false;
+                        for (DocumentSnapshot doc : task.getResult()) {
+                            // Nếu tìm thấy user khác có cùng username thì đã bị trùng
+                            if (!doc.getId().equals(user.getUid())) {
+                                isTaken = true;
+                                break;
+                            }
+                        }
+                        if (isTaken) {
+                            Toast.makeText(EditActivity.this, "Username already taken", Toast.LENGTH_SHORT).show();
+                            setEnableSave(true);
+                        } else {
+                            updateUsername();
+                        }
+                    } else {
+                        Log.e(TAG, "Error checking username", task.getException());
+                        Toast.makeText(EditActivity.this, "Error checking username availability", Toast.LENGTH_SHORT).show();
+                        setEnableSave(true);
                     }
                 });
-        profileDoc.update("username", username)
-                .addOnSuccessListener(new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Log.d(TAG, "DocumentSnapshot successfully updated!");
-                    }
+    }
+
+    private void updateBirthdate(String birthdate) {
+        if (user == null) return;
+
+        DocumentReference userDoc = db.collection("users").document(user.getUid());
+        DocumentReference profileDoc = db.collection("profiles").document(user.getUid());
+
+        userDoc.update("birthdate", birthdate)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "User birthdate updated");
+                    profileDoc.update("birthdate", birthdate)
+                            .addOnSuccessListener(aVoid2 -> {
+                                Log.d(TAG, "Profile birthdate updated");
+                                Toast.makeText(EditActivity.this, "Birthdate updated successfully", Toast.LENGTH_SHORT).show();
+                                handler.postDelayed(() -> {
+                                    Intent intent = new Intent(EditActivity.this, EditProfileActivity.class);
+                                    startActivity(intent);
+                                    finish();
+                                }, 500);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Error updating profile birthdate", e);
+                                Toast.makeText(EditActivity.this, "Failed to update", Toast.LENGTH_SHORT).show();
+                                setEnableSave(true);
+                            });
                 })
-                .addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.w(TAG, "Error updating document", e);
-                    }
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error updating user birthdate", e);
+                    Toast.makeText(EditActivity.this, "Failed to update", Toast.LENGTH_SHORT).show();
+                    setEnableSave(true);
                 });
     }
 

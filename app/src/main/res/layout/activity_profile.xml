@@ -175,7 +175,7 @@
         android:text="Edit profile"
         style="@style/tiktok_button_transparent"
         android:visibility="gone"/>
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -186,5 +186,5 @@
         android:layout_height="wrap_content"
         android:id="@+id/recycle_view_video_summary">
     </androidx.recyclerview.widget.RecyclerView>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>
