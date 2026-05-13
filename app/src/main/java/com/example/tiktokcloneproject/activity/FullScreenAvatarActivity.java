@@ -11,6 +11,7 @@ import android.view.View;
 import android.widget.ImageView;
 
 import com.example.tiktokcloneproject.R;
+import com.example.tiktokcloneproject.helper.StaticVariable;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.auth.FirebaseAuth;
@@ -42,7 +43,6 @@ public class FullScreenAvatarActivity extends AppCompatActivity{
         }
 
         imvFullScreen = (ImageView) findViewById(R.id.imvFullscreen);
-//        imvFullScreen.setImageURI(((GlobalVariable) this.getApplication()).getAvatarUri());
 
         getImage();
         imvFullScreen.setOnClickListener(new View.OnClickListener() {
@@ -54,12 +54,12 @@ public class FullScreenAvatarActivity extends AppCompatActivity{
     }
 
     private void getImage() {
-        folderPath = "/user_avatars";
+        // ĐÃ SỬA: Xóa dấu / ở đầu đường dẫn
+        folderPath = "user_avatars";
         fileName = user.getUid();
         StorageReference download = storageReference.child(folderPath).child(fileName);
 
-        long MAX_BYTE = 1024*1024;
-        download.getBytes(MAX_BYTE)
+        download.getBytes(StaticVariable.MAX_BYTES_AVATAR)
                 .addOnSuccessListener(new OnSuccessListener<byte[]>() {
                     @Override
                     public void onSuccess(byte[] bytes) {

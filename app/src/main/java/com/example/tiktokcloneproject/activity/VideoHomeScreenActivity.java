@@ -9,54 +9,38 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
-import androidx.viewpager2.widget.CompositePageTransformer;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.tiktokcloneproject.R;
 import com.example.tiktokcloneproject.adapters.VideoAdapter;
-import com.example.tiktokcloneproject.fragment.InboxFragment;
-import com.example.tiktokcloneproject.fragment.ProfileFragment;
-import com.example.tiktokcloneproject.fragment.VideoFragment;
-import com.example.tiktokcloneproject.helper.OnSwipeTouchListener;
 import com.example.tiktokcloneproject.model.Video;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
-import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.FirebaseFirestoreException;
-import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
 
-public class VideoHomeScreenActivity extends Activity implements View.OnClickListener{
-    private String videoId;
+public class VideoHomeScreenActivity extends Activity implements View.OnClickListener {
     private FirebaseFirestore db;
     private ViewPager2 viewPager2;
     private ArrayList<Video> videos;
     private VideoAdapter videoAdapter;
-    private FrameLayout mainFragment;
     private FirebaseAuth mAuth;
     private FirebaseUser user;
     private long pressedTime;
-    private String message = "";
     private Button btnHome, btnAddVideo, btnInbox, btnProfile, btnSearch;
-    private static long pressedBackTime = 0;
     private Intent intentMain = null;
-    boolean mainFragmentsCreated = false;
+    private ListenerRegistration videoListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,103 +50,88 @@ public class VideoHomeScreenActivity extends Activity implements View.OnClickLis
         mAuth = FirebaseAuth.getInstance();
         user = mAuth.getCurrentUser();
         db = FirebaseFirestore.getInstance();
-        btnHome = (Button)findViewById(R.id.btnHome);
-        //  btnFriend = (Button) findViewById(R.id.btnFriend);
-        btnAddVideo = (Button)findViewById(R.id.btnAddVideo);
-        btnInbox = (Button)findViewById(R.id.btnInbox);
-        btnProfile = (Button) findViewById(R.id.btnProfile);
+        
+        btnHome = findViewById(R.id.btnHome);
+        btnAddVideo = findViewById(R.id.btnAddVideo);
+        btnInbox = findViewById(R.id.btnInbox);
+        btnProfile = findViewById(R.id.btnProfile);
+        btnSearch = findViewById(R.id.btnSearch);
 
-        btnSearch= (Button)findViewById(R.id.btnSearch);
-        mainFragment = (FrameLayout) findViewById(R.id.main_fragment);
+        btnHome.setOnClickListener(this);
+        btnAddVideo.setOnClickListener(this);
+        btnInbox.setOnClickListener(this);
+        btnProfile.setOnClickListener(this);
+        btnSearch.setOnClickListener(this);
 
         viewPager2 = findViewById(R.id.viewPager);
         videos = new ArrayList<>();
         videoAdapter = new VideoAdapter(this, videos);
         VideoAdapter.setUser(user);
         viewPager2.setAdapter(videoAdapter);
+        
         viewPager2.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                super.onPageScrolled(position, positionOffset, positionOffsetPixels);
-
-            }
-
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
-                videoAdapter.playVideo(position);
-                Log.e("Selected_Page", String.valueOf(videoAdapter.getCurrentPosition()));
-                Log.e("Selected_Page", videos.get(position).getAuthorId());
-
-                videoAdapter.updateCurrentPosition(position);
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-                super.onPageScrollStateChanged(state);
+                if (videoAdapter != null) {
+                    videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
+                    videoAdapter.updateCurrentPosition(position);
+                    videoAdapter.playVideo(position);
+                    videoAdapter.updateWatchCount(position);
+                }
             }
         });
-        viewPager2.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View view) {
-
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View view) {
-//                Log.i("position", viewPager2.getVerticalScrollbarPosition() + "");
-                videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
-
-            }
-        });
-
 
         loadVideos();
         intentMain = new Intent(this, HomeScreenActivity.class);
-
-
     }
 
     private void loadVideos() {
-        db.collection("videos")
-                .addSnapshotListener(new EventListener<QuerySnapshot>() {
-                    @Override
-                    public void onEvent(@Nullable QuerySnapshot snapshots,
-                                        @Nullable FirebaseFirestoreException e) {
-                        if (e != null) {
-                            Log.w(TAG, "listen:error", e);
-                            return;
-                        }
+        if (db == null) return;
 
+        videoListener = db.collection("videos")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(20)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null) {
+                        Log.e(TAG, "Listen error", e);
+                        return;
+                    }
+
+                    if (snapshots != null) {
                         for (DocumentChange dc : snapshots.getDocumentChanges()) {
+                            Video video = dc.getDocument().toObject(Video.class);
+                            int newIndex = dc.getNewIndex();
+                            int oldIndex = dc.getOldIndex();
+
                             switch (dc.getType()) {
                                 case ADDED:
-                                    Video video = dc.getDocument().toObject(Video.class);
-                                    videos.add(0, video);
-                                    videoAdapter.notifyItemInserted(0);
+                                    videos.add(newIndex, video);
+                                    videoAdapter.notifyItemInserted(newIndex);
                                     break;
                                 case MODIFIED:
-                                    Log.d(TAG, "Modified city: " + dc.getDocument().getData());
+                                    if (oldIndex == newIndex) {
+                                        videos.set(newIndex, video);
+                                        videoAdapter.notifyItemChanged(newIndex);
+                                    } else {
+                                        videos.remove(oldIndex);
+                                        videos.add(newIndex, video);
+                                        videoAdapter.notifyItemMoved(oldIndex, newIndex);
+                                        videoAdapter.notifyItemChanged(newIndex);
+                                    }
                                     break;
                                 case REMOVED:
-                                    Log.d(TAG, "Removed city: " + dc.getDocument().getData());
+                                    videos.remove(oldIndex);
+                                    videoAdapter.notifyItemRemoved(oldIndex);
                                     break;
                             }
                         }
-
                     }
                 });
     }
 
-    @Override public void onStart() {
-        super.onStart();
-//        loadVideos();
-    }
-
     @Override
     public void onBackPressed() {
-
         if (pressedTime + 2000 > System.currentTimeMillis()) {
             super.onBackPressed();
             finish();
@@ -172,141 +141,88 @@ public class VideoHomeScreenActivity extends Activity implements View.OnClickLis
         pressedTime = System.currentTimeMillis();
     }
 
-
-
     @Override
     public void onClick(View view) {
-//        if (view.getId() == btnProfile.getId()) {
-//            ft = getSupportFragmentManager().beginTransaction();
-//            profileFragment = ProfileFragment.newInstance("profile", "");
-//            ft.replace(R.id.main_fragment, profileFragment);
-//            ft.commit();
-//            return;
-//        }
-
-        if (view.getId() == btnSearch.getId())
-        {
+        int id = view.getId();
+        if (id == R.id.btnSearch) {
             intentMain.putExtra("fragment_search", "");
-            intentMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intentMain);
-        }
-        if(view.getId() == btnProfile.getId()) {
+        } else if (id == R.id.btnProfile) {
             handleProfileClick();
-        }
-        if(view.getId() == btnAddVideo.getId()) {
+        } else if (id == R.id.btnAddVideo) {
             handleAddClick();
-        }
-        if(view.getId() == btnHome.getId()) {
-            handleHomeClick();
-        }
-        if(view.getId() == btnInbox.getId()) {
+        } else if (id == R.id.btnInbox) {
             handleInboxClick();
         }
-    }//on click
+    }
 
     private void handleProfileClick() {
-
-        if(user == null) {
-            Intent intent = new Intent(this, SignupChoiceActivity.class);
-            startActivity(intent);
+        if (user == null) {
+            startActivity(new Intent(this, SignupChoiceActivity.class));
             return;
         }
         intentMain.putExtra("fragment_profile", "");
-        intentMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intentMain);
     }
 
     private void handleAddClick() {
-        if(user == null) {
+        if (user == null) {
             showNiceDialogBox(this, null, null);
             return;
         }
-        Intent intent = new Intent(this, CameraActivity.class);
-        if (!mainFragmentsCreated) {
-            intentMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            mainFragmentsCreated = true;
-        }
-        startActivity(intent);
+        startActivity(new Intent(this, CameraActivity.class));
     }
 
     private void handleInboxClick() {
-        if(user == null) {
+        if (user == null) {
             showNiceDialogBox(this, null, null);
             return;
         }
         intentMain.putExtra("fragment_inbox", "");
-        if (!mainFragmentsCreated) {
-            intentMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            mainFragmentsCreated = true;
-        }
         startActivity(intentMain);
     }
 
-    private void handleHomeClick() {
-//        if(getSupportFragmentManager().findFragmentById(R.id.main_fragment) instanceof VideoFragment) {
-//            Intent intent = new Intent(context, HomeScreenActivity.class);
-//            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-//            startActivity(intent);
-//            return;
-//        }
-//        Intent intent = new Intent(context, HomeScreenActivity.class);
-//        startActivity(intent);
-
-    }
-
     private void showNiceDialogBox(Context context, @Nullable String title, @Nullable String message) {
-        if(title == null) {
-            title = getString(R.string.request_account_title);
-        }
-        if(message == null) {
-            message = getString(R.string.request_account_message);
-        }
+        if (title == null) title = getString(R.string.request_account_title);
+        if (message == null) message = getString(R.string.request_account_message);
         try {
-            //CAUTION: sometimes TITLE and DESCRIPTION include HTML markers
-            AlertDialog.Builder myBuilder = new AlertDialog.Builder(context, R.style.AlertDialogTheme);
-            myBuilder.setIcon(R.drawable.splash_background)
+            new AlertDialog.Builder(context, R.style.AlertDialogTheme)
+                    .setIcon(R.drawable.splash_background)
                     .setTitle(title)
                     .setMessage(message)
-                    .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialogInterface, int i) {
-                            if(context instanceof HomeScreenActivity) {
-                                return;
-                            }
-                            Intent intent = new Intent(context, VideoHomeScreenActivity.class);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                            startActivity(intent);
-                        }
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Sign up/Sign in", (dialog, whichOne) -> {
+                        Intent intent = new Intent(context, MainActivity.class);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                        startActivity(intent);
                     })
-                    .setPositiveButton("Sign up/Sign in", new DialogInterface.OnClickListener()
-                    {
-                        public void onClick(DialogInterface dialog, int whichOne) {
-                            Intent intent = new Intent(context, MainActivity.class);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                            startActivity(intent);
-                        }}) //setNegativeButton
                     .show();
+        } catch (Exception e) {
+            Log.e("Error DialogBox", e.getMessage());
         }
-        catch (Exception e) { Log.e("Error DialogBox", e.getMessage() ); }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        SharedPreferences currentPosPref = this.getSharedPreferences("position", Context.MODE_PRIVATE);
-        SharedPreferences.Editor positionEditor = currentPosPref.edit();
-        int currentPosition = videoAdapter.getCurrentPosition();
-        positionEditor.putInt("position", currentPosition);
-        videoAdapter.pauseVideo(currentPosition);
+        if (videoAdapter != null) {
+            videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        SharedPreferences currentPosPref = this.getSharedPreferences("position", Context.MODE_PRIVATE);
-        int currentPosition = currentPosPref.getInt("position", -1);
-        if (currentPosition != -1) {
-            videoAdapter.playVideo(currentPosition);
+        if (videoAdapter != null) {
+            videoAdapter.playVideo(videoAdapter.getCurrentPosition());
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (videoListener != null) {
+            videoListener.remove();
         }
     }
 }

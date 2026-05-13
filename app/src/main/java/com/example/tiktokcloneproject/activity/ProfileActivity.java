@@ -86,7 +86,6 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-//        overridePendingTransition(R.anim.slide_in_bottom, R.anim.slide_out_bottom);
         setContentView(R.layout.activity_profile);
         Intent intent = getIntent();
         mAuth = FirebaseAuth.getInstance();
@@ -134,12 +133,9 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
         llFollowers.setOnClickListener(this);
         llFollowing.setOnClickListener(this);
 
-        // Đăng ký click listener cho menu và avatar
         TextView txvMenu = (TextView) findViewById(R.id.text_menu);
         if (txvMenu != null) txvMenu.setOnClickListener(this);
         imvAvatarProfile.setOnClickListener(this);
-
-        imvAvatarProfile.setImageURI(avatarUri);
 
         db = FirebaseFirestore.getInstance();
         setLikes(userId);
@@ -147,14 +143,12 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
 
         storage = FirebaseStorage.getInstance();
         storageReference = storage.getReference();
-        //set nút follow/edit profile
-        if (user == null) {//chưa đăng nhập (vào profile thông qua search)
+        
+        if (user == null) {
             handleFollow();
         } else {
             currentUserID = user.getUid();
             if (userId.equals(user.getUid())) {
-
-                //vào profile của mình
                 btn = (Button) findViewById(R.id.button_edit_profile);
                 edtBio.setVisibility(View.VISIBLE);
                 btn.setVisibility(View.VISIBLE);
@@ -163,23 +157,13 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
 
                 edtBio.addTextChangedListener(new TextWatcher() {
                     @Override
-                    public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                        if (charSequence != null && charSequence.toString().equals("⠀")) {
-                            edtBio.setText("");
-                        }
-                    }
+                    public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
 
                     @Override
-                    public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                        if (charSequence != null && charSequence.toString().isEmpty()) {
-                            edtBio.setText("⠀");
-                        }
-                    }
+                    public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {}
 
                     @Override
-                    public void afterTextChanged(Editable editable) {
-
-                    }
+                    public void afterTextChanged(Editable editable) {}
                 });
                 edtBio.setOnFocusChangeListener(new View.OnFocusChangeListener() {
                     @Override
@@ -192,27 +176,23 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                     }
                 });
                 btnEditProfile.setOnClickListener(this);
-            } else {//vào profile người khác
+            } else {
                 handleFollow();
-
             }
-
         }
-
 
         videoSummaries = new ArrayList<VideoSummary>();
         GridLayoutManager gridLayoutManager = new GridLayoutManager(this, 3);
         recVideoSummary.setLayoutManager(gridLayoutManager);
         recVideoSummary.addItemDecoration(new GridSpacingItemDecoration(3, 10, true));
         setVideoSummaries();
-    }//on create
+    }
 
     boolean isFollowed = false;
 
     @Override
     public void onStart() {
         super.onStart();
-        // Toast.makeText(this, "start", Toast.LENGTH_SHORT).show();
         if (docRef != null) {
             docRef.get().addOnCompleteListener(task -> {
                 if (task.isSuccessful()) {
@@ -222,17 +202,13 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                         txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
                         txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
                         txvUserName.setText("@" + document.getString(USERNAME_LABEL));
-//                        oldBioText = document.getString("bio");
-//                        edtBio.setText(oldBioText);
-
-                    } else { }
-                } else { }
+                    }
+                }
             });
         }
     }
 
     private void handleFollow() {
-        //bio cần set lại là text vỉew
         btn = (Button) findViewById(R.id.button_follow);
         if (btn == null) return;
         btn.setVisibility(View.VISIBLE);
@@ -247,34 +223,24 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                         DocumentSnapshot document = task.getResult();
                         if (document != null && document.exists()) {
                             isFollowed = true;
-                            Log.d(TAG, "DocumentSnapshot data: " + document.getData());
                             handleFollowed();
                             notifyFollow();
-
                         } else {
-                            Log.d(TAG, "No such document");
                             isFollowed = false;
                             handleUnfollowed();
-
-
                         }
-                    } else {
-                        Log.d(TAG, "get failed with ", task.getException());
                     }
                 }
             });
-
         } else {
             btn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View view) {
                     Intent intentMain = new Intent(ProfileActivity.this, MainActivity.class);
-
                     startActivity(intentMain);
                 }
             });
         }
-
     }
 
     public void notifyFollow() {
@@ -288,12 +254,7 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                             if (document != null && document.exists()) {
                                 String username = document.get("username", String.class);
                                 Notification.pushNotification(username, userId, StaticVariable.FOLLOW);
-                                Log.d(ContentValues.TAG, "DocumentSnapshot data: " + document.getData());
-                            } else {
-                                Log.d(ContentValues.TAG, "No such document");
                             }
-                        } else {
-                            Log.d(ContentValues.TAG, "get failed with ", task.getException());
                         }
                     }
                 });
@@ -313,56 +274,38 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                                         document.getString("thumbnailUri"),
                                         document.getLong("watchCount")));
                             }
-                            if (videoSummaries.size() == 0) {
-                                return;
-                            }
+                            if (videoSummaries.size() == 0) return;
                             VideoSummaryAdapter videoSummaryAdapter = new VideoSummaryAdapter(getApplicationContext(), videoSummaries);
                             recVideoSummary.setAdapter(videoSummaryAdapter);
-                        } else {
-                            Log.d("error", "Error getting documents: ", task.getException());
                         }
                     }
                 });
     }
 
     public class GridSpacingItemDecoration extends RecyclerView.ItemDecoration {
-
         private int spanCount;
         private int spacing;
         private boolean includeEdge;
-
         public GridSpacingItemDecoration(int spanCount, int spacing, boolean includeEdge) {
             this.spanCount = spanCount;
             this.spacing = spacing;
             this.includeEdge = includeEdge;
         }
-
         @Override
         public void getItemOffsets(Rect outRect, View view, RecyclerView parent, RecyclerView.State state) {
-            int position = parent.getChildAdapterPosition(view); // item position
-            int column = position % spanCount; // item column
-
+            int position = parent.getChildAdapterPosition(view);
+            int column = position % spanCount;
             if (includeEdge) {
-                outRect.left = spacing - column * spacing / spanCount; // spacing - column * ((1f / spanCount) * spacing)
-                outRect.right = (column + 1) * spacing / spanCount; // (column + 1) * ((1f / spanCount) * spacing)
-
-                if (position < spanCount) { // top edge
-                    outRect.top = spacing;
-                }
-                outRect.bottom = spacing; // item bottom
+                outRect.left = spacing - column * spacing / spanCount;
+                outRect.right = (column + 1) * spacing / spanCount;
+                if (position < spanCount) outRect.top = spacing;
+                outRect.bottom = spacing;
             } else {
-                outRect.left = column * spacing / spanCount; // column * ((1f / spanCount) * spacing)
-                outRect.right = spacing - (column + 1) * spacing / spanCount; // spacing - (column + 1) * ((1f /    spanCount) * spacing)
-                if (position >= spanCount) {
-                    outRect.top = spacing; // item top
-                }
+                outRect.left = column * spacing / spanCount;
+                outRect.right = spacing - (column + 1) * spacing / spanCount;
+                if (position >= spanCount) outRect.top = spacing;
             }
         }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
     }
 
     void updateBio() {
@@ -375,40 +318,25 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                     })
                     .addOnFailureListener(e -> {
                         Toast.makeText(ProfileActivity.this, "Failed to update bio", Toast.LENGTH_SHORT).show();
-                        Log.e(TAG, "Error updating bio", e);
                     });
         }
     }
-
 
     public void onClick(View v) {
         if (v.getId() == R.id.text_menu) {
             showDialog();
             return;
         }
-
         if (v.getId() == R.id.imvAvatarProfile) {
-//            Bundle bundle = new Bundle();
-//            bundle.putString("id", user.getUid());
-//            Intent intent = new Intent(ProfileActivity.this, ShareAccountActivity.class);
-//            intent.putExtras(bundle);
-//            startActivity(intent);
-
             showShareAccountDialog();
             return;
         }
         if (btnEditProfile != null && v.getId() == btnEditProfile.getId()) {
-//            Toast.makeText(this, "YYY", Toast.LENGTH_SHORT).show();
             moveToAnotherActivity(EditProfileActivity.class);
-            finish();
-
         }
         if (v.getId() == R.id.btnBackProfile) {
-
             finish();
-
         }
-
         if (btnUpdateBio != null && v.getId() == btnUpdateBio.getId()) {
             updateBio();
             findViewById(R.id.layout_bio).setVisibility(View.GONE);
@@ -437,13 +365,11 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
             }
         }
         if (llFollowing != null && v.getId() == llFollowing.getId()) {
-
             if (currentUserID != null && currentUserID.equals(userId)) {
                 Intent intent = new Intent(ProfileActivity.this, FollowListActivity.class);
                 intent.putExtra("pageIndex", 0);
                 startActivity(intent);
             }
-
         }
     }
 
@@ -451,16 +377,12 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
         final Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(R.layout.share_account_layout);
-
         TextView txvUsernameInSharedPlace = dialog.findViewById(R.id.txvUsernameInSharedPlace);
         ImageView imvAvatarInSharedPlace = dialog.findViewById(R.id.imvAvatarInSharedPlace);
         Button btnCopyURL = dialog.findViewById(R.id.btnCopyURL);
         TextView txvCancelInSharedPlace = dialog.findViewById(R.id.txvCancelInSharedPlace);
-
         if (bitmap != null) imvAvatarInSharedPlace.setImageBitmap(bitmap);
-
         txvUsernameInSharedPlace.setText(txvUserName.getText());
-
         btnCopyURL.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -471,7 +393,6 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                 Toast.makeText(ProfileActivity.this, "Profile link has been saved to clipboard", Toast.LENGTH_SHORT).show();
             }
         });
-
         imvAvatarInSharedPlace.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -479,7 +400,6 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                 startActivity(intent);
             }
         });
-
         txvCancelInSharedPlace.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -491,7 +411,6 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
         if (window != null) {
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.getAttributes().windowAnimations = R.style.DialogAnimation;
             window.setGravity(Gravity.BOTTOM);
         }
     }
@@ -500,10 +419,8 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
         final Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(R.layout.bottom_sheet_layout);
-
         LinearLayout llSetting = dialog.findViewById(R.id.llSetting);
         LinearLayout llSignOut = dialog.findViewById(R.id.llSignOut);
-
         llSetting.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -518,16 +435,13 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                 dialog.dismiss();
             }
         });
-
         dialog.show();
         Window window = dialog.getWindow();
         if (window != null) {
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.getAttributes().windowAnimations = R.style.DialogAnimation;
             window.setGravity(Gravity.BOTTOM);
         }
-
     }
 
     public void signOut(View v) {
@@ -538,18 +452,13 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                         .requestIdToken(getString(R.string.default_web_client_id))
                         .requestEmail()
                         .build();
-
                 GoogleSignInClient mGoogleSignInClient = GoogleSignIn.getClient(this, gso);
                 mGoogleSignInClient.signOut();
-            } catch (Exception e) {
-                Log.e(TAG, "Google sign out error", e);
-            }
+            } catch (Exception e) {}
         }
-
         Intent intent = new Intent(ProfileActivity.this, HomeScreenActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
-
         finish();
     }
 
@@ -568,7 +477,7 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                         edtBio.setText(bio);
                     }
                 }
-            }).addOnFailureListener(e -> Log.e(TAG, "Error loading bio", e));
+            });
         }
     }
 
@@ -584,67 +493,31 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                 }
                 if (isFollowed) return;
                 isFollowed = true;
-
-                Log.d(TAG, "follow clicked");
                 Map<String, Object> Data = new HashMap<>();
                 Data.put("userID", userId);
-                //thêm following
                 db.collection("profiles").document(currentUserID)
                         .collection("following").document(userId)
                         .set(Data)
                         .addOnSuccessListener(new OnSuccessListener<Void>() {
                             @Override
                             public void onSuccess(Void aVoid) {
-                                Log.d(TAG, "DocumentSnapshot successfully written!");
                                 db.collection("profiles").document(currentUserID)
                                         .update("following", FieldValue.increment(1));
-                                docRef = db.collection("profiles").document(userId);
-                                docRef.get().addOnCompleteListener(task -> {
-                                    if (task.isSuccessful() && task.getResult() != null) {
-                                        DocumentSnapshot document = task.getResult();
-                                        if (document.exists()) {
-                                            txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
-                                            txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
-                                        }
-                                    }
-                                });
-
                                 handleFollowed();
                             }
-                        })
-                        .addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.w(TAG, "Error writing document", e);
-                            }
                         });
-
-                //thêm follower
-
                 Map<String, Object> Data1 = new HashMap<>();
                 Data1.put("userID", currentUserID);
-                Log.d(TAG, currentUserID);
                 db.collection("profiles").document(userId)
                         .collection("followers").document(currentUserID)
                         .set(Data1)
                         .addOnSuccessListener(new OnSuccessListener<Void>() {
                             @Override
                             public void onSuccess(Void aVoid) {
-
                                 db.collection("profiles").document(userId)
                                         .update("followers", FieldValue.increment(1));
-                                Log.d(TAG, "follower added");
-
-                            }
-                        })
-                        .addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.w(TAG, "follower fail", e);
                             }
                         });
-
-
             }
         });
     }
@@ -652,50 +525,23 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
     private void handleFollowed() {
         if (btn == null) return;
         btn.setText("Unfollow");
-
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (user == null) return;
                 if (!isFollowed) return;
                 isFollowed = false;
-                Log.d(TAG, "unfollow clicked");
-
-
-                //xóa following
                 db.collection("profiles").document(currentUserID)
                         .collection("following").document(userId)
                         .delete()
                         .addOnSuccessListener(new OnSuccessListener<Void>() {
                             @Override
                             public void onSuccess(Void aVoid) {
-                                Log.d(TAG, "DocumentSnapshot successfully deleted!");
                                 db.collection("profiles").document(currentUserID)
                                         .update("following", FieldValue.increment(-1));
-
-                                docRef = db.collection("profiles").document(userId);
-                                docRef.get().addOnCompleteListener(task -> {
-                                    if (task.isSuccessful() && task.getResult() != null) {
-                                        DocumentSnapshot document = task.getResult();
-                                        if (document.exists()) {
-                                            txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
-                                            txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
-                                        }
-                                    }
-                                });
-
-
                                 handleUnfollowed();
                             }
-                        })
-                        .addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.w(TAG, "Error deleting document", e);
-                            }
                         });
-
-                //xóa follower
                 db.collection("profiles").document(userId)
                         .collection("followers").document(currentUserID)
                         .delete()
@@ -704,17 +550,8 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                             public void onSuccess(Void aVoid) {
                                 db.collection("profiles").document(userId)
                                         .update("followers", FieldValue.increment(-1));
-                                Log.d(TAG, "DocumentSnapshot successfully deleted!");
-                            }
-                        })
-                        .addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.w(TAG, "Error deleting document", e);
                             }
                         });
-
-
             }
         });
     }
@@ -722,10 +559,9 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
     @Override
     protected void onResume() {
         super.onResume();
-
         if (userId != null) {
-            StorageReference download = storageReference.child("/user_avatars").child(userId);
-
+            // ĐÃ SỬA: Xóa dấu / ở đầu path
+            StorageReference download = storageReference.child("user_avatars").child(userId);
             download.getBytes(StaticVariable.MAX_BYTES_AVATAR)
                     .addOnSuccessListener(new OnSuccessListener<byte[]>() {
                         @Override
@@ -736,62 +572,38 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                     })
                     .addOnFailureListener(new OnFailureListener() {
                         @Override
-                        public void onFailure(@NonNull Exception e) {
-                            // Do nothing
-                        }
+                        public void onFailure(@NonNull Exception e) {}
                     });
         }
     }
 
     public void setLikes(String userId) {
         if (userId == null) return;
-        try {
-            db.collection("profiles").document(userId).collection("public_videos").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                @Override
-                public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        ArrayList<String> userVideos = new ArrayList<>();
-                        for (QueryDocumentSnapshot document : task.getResult()) {
-                            String vidId = document.getString("videoId");
-                            if (vidId != null && !vidId.isEmpty()) userVideos.add(vidId);
-                        }
-                        Log.d("Uservideo", userVideos.toString());
-
-                        db.collection("likes").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                            @Override
-                            public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                                if (task.isSuccessful() && task.getResult() != null) {
-                                    totalLikes = 0;
-                                    for (QueryDocumentSnapshot document : task.getResult()) {
-                                        Log.d("Use", document.getId());
-
-                                        if (userVideos.contains(document.getId())) {
-                                            totalLikes += document.getData().size();
-                                        }
-                                    }
-                                    if (txvLikes != null) txvLikes.setText(String.valueOf(totalLikes));
-                                } else {
-                                    Log.d(TAG, "Error getting documents: ", task.getException());
-                                }
-                            }
-                        }).addOnFailureListener(new OnFailureListener() {
-                            @Override
-                            public void onFailure(@NonNull Exception e) {
-                                Log.e(TAG, "Error getting likes: ", e);
-                            }
-                        });
-                    } else {
-                        Log.d(TAG, "Error getting documents: ", task.getException());
+        db.collection("profiles").document(userId).collection("public_videos").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    ArrayList<String> userVideos = new ArrayList<>();
+                    for (QueryDocumentSnapshot document : task.getResult()) {
+                        String vidId = document.getString("videoId");
+                        if (vidId != null && !vidId.isEmpty()) userVideos.add(vidId);
                     }
+                    db.collection("likes").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful() && task.getResult() != null) {
+                                totalLikes = 0;
+                                for (QueryDocumentSnapshot document : task.getResult()) {
+                                    if (userVideos.contains(document.getId())) {
+                                        totalLikes += document.getData().size();
+                                    }
+                                }
+                                if (txvLikes != null) txvLikes.setText(String.valueOf(totalLikes));
+                            }
+                        }
+                    });
                 }
-            }).addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception e) {
-                    Log.e(TAG, "Error getting videos: ", e);
-                }
-            });
-        } catch (Exception exception) {
-            Log.d("exception", exception.toString());
-        }
+            }
+        });
     }
 }

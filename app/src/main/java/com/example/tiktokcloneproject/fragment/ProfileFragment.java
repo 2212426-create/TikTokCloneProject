@@ -453,7 +453,8 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
     public void onResume() {
         super.onResume();
         if (userId != null && !userId.isEmpty() && storageReference != null) {
-            storageReference.child("/user_avatars").child(userId).getBytes(StaticVariable.MAX_BYTES_AVATAR)
+            // ĐÃ SỬA: Xóa dấu / ở đầu "user_avatars"
+            storageReference.child("user_avatars").child(userId).getBytes(StaticVariable.MAX_BYTES_AVATAR)
                     .addOnSuccessListener(bytes -> {
                         if (isAdded()) {
                             bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);

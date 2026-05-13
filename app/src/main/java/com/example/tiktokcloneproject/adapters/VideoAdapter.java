@@ -6,7 +6,6 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -53,7 +52,6 @@ import java.util.List;
 import java.util.Map;
 
 public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHolder> {
-
     private List<Video> videos;
     private Context context;
     private int currentPosition = 0;
@@ -78,9 +76,7 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
     @Override
     public void onViewAttachedToWindow(@NonNull VideoViewHolder holder) {
         activeHolders.put(holder.getBindingAdapterPosition(), holder);
-        if (holder.getBindingAdapterPosition() == currentPosition) {
-            holder.playVideo();
-        }
+        if (holder.getBindingAdapterPosition() == currentPosition) holder.playVideo();
     }
 
     @Override
@@ -96,28 +92,16 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
     }
 
     @Override
-    public int getItemCount() {
-        return videos != null ? videos.size() : 0;
-    }
+    public int getItemCount() { return videos != null ? videos.size() : 0; }
 
-    public void updateCurrentPosition(int pos) {
-        this.currentPosition = pos;
-    }
-
-    public int getCurrentPosition() {
-        return currentPosition;
-    }
-
-    public static void setUser(FirebaseUser user) {
-        // This method is called from Activities/Fragments to set the current user.
-        // The VideoViewHolder already uses FirebaseAuth.getInstance().getCurrentUser().
-    }
+    public void updateCurrentPosition(int pos) { this.currentPosition = pos; }
+    public int getCurrentPosition() { return currentPosition; }
+    public static void setUser(FirebaseUser user) {}
 
     public void updateWatchCount(int position) {
         if (videos != null && position >= 0 && position < videos.size()) {
             String videoId = videos.get(position).getVideoId();
-            FirebaseFirestore.getInstance().collection("videos").document(videoId)
-                    .update("watchCount", FieldValue.increment(1));
+            FirebaseFirestore.getInstance().collection("videos").document(videoId).update("watchCount", FieldValue.increment(1));
         }
     }
 
@@ -137,11 +121,9 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
         ImageView imvAvatar, imvPause, imvMore, imvAppear, imvVolume, imvShare;
         TextView txvDescription, tvTitle, tvComment, tvFavorites;
         ProgressBar pbLoading;
-        
         String authorId, videoId, currentUserId;
         int totalLikes, totalComments;
         boolean isLiked = false, isPlaying = false;
-        
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         ListenerRegistration videoListener;
@@ -177,68 +159,36 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
 
         private void initPlayer() {
             if (exoPlayer == null) {
-                LoadControl loadControl = new DefaultLoadControl.Builder()
-                        .setBufferDurationsMs(500, 2000, 500, 500)
-                        .setPrioritizeTimeOverSizeThresholds(true)
-                        .build();
-
-                DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory()
-                        .setAllowCrossProtocolRedirects(true)
-                        .setConnectTimeoutMs(5000)
-                        .setReadTimeoutMs(5000);
-
-                DataSource.Factory cacheDataSourceFactory = new CacheDataSource.Factory()
-                        .setCache(GlobalVariable.getVideoCache())
-                        .setUpstreamDataSourceFactory(httpDataSourceFactory)
-                        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
-
-                exoPlayer = new ExoPlayer.Builder(itemView.getContext())
-                        .setLoadControl(loadControl)
-                        .setMediaSourceFactory(new DefaultMediaSourceFactory(cacheDataSourceFactory))
-                        .build();
-                
+                LoadControl loadControl = new DefaultLoadControl.Builder().setBufferDurationsMs(500, 2000, 500, 500).build();
+                DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true);
+                DataSource.Factory cacheDataSourceFactory = new CacheDataSource.Factory().setCache(GlobalVariable.getVideoCache()).setUpstreamDataSourceFactory(httpDataSourceFactory);
+                exoPlayer = new ExoPlayer.Builder(itemView.getContext()).setLoadControl(loadControl).setMediaSourceFactory(new DefaultMediaSourceFactory(cacheDataSourceFactory)).build();
                 videoView.setPlayer(exoPlayer);
                 exoPlayer.setRepeatMode(Player.REPEAT_MODE_ONE);
-                
                 exoPlayer.addListener(new Player.Listener() {
-                    @Override
-                    public void onPlaybackStateChanged(int state) {
-                        if (pbLoading == null) return;
-                        pbLoading.setVisibility(state == Player.STATE_BUFFERING ? View.VISIBLE : View.GONE);
+                    @Override public void onPlaybackStateChanged(int state) {
+                        if (pbLoading != null) pbLoading.setVisibility(state == Player.STATE_BUFFERING ? View.VISIBLE : View.GONE);
                     }
                 });
             }
         }
 
         public void playVideo() {
-            if (exoPlayer == null) return;
-            exoPlayer.play();
-            isPlaying = true;
-            if (imvAppear != null) imvAppear.setVisibility(View.GONE);
-            if (imvPause != null) imvPause.setVisibility(View.GONE);
+            if (exoPlayer != null) { exoPlayer.play(); isPlaying = true; if (imvPause != null) imvPause.setVisibility(View.GONE); }
         }
 
         public void pauseVideo() {
-            if (exoPlayer != null) {
-                exoPlayer.pause();
-                isPlaying = false;
-                if (imvPause != null) imvPause.setVisibility(View.VISIBLE);
-            }
+            if (exoPlayer != null) { exoPlayer.pause(); isPlaying = false; if (imvPause != null) imvPause.setVisibility(View.VISIBLE); }
         }
 
         public void cleanup() {
             if (videoListener != null) { videoListener.remove(); videoListener = null; }
-            if (exoPlayer != null) {
-                exoPlayer.release();
-                exoPlayer = null;
-                videoView.setPlayer(null);
-            }
+            if (exoPlayer != null) { exoPlayer.release(); exoPlayer = null; videoView.setPlayer(null); }
         }
 
         @SuppressLint("ClickableViewAccessibility")
         public void setVideoObjects(Video video, int position) {
             if (video == null) return;
-            
             this.authorId = video.getAuthorId();
             this.videoId = video.getVideoId();
             this.totalLikes = video.getTotalLikes();
@@ -257,16 +207,15 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
                 exoPlayer.setPlayWhenReady(position == currentPosition);
             }
 
-            StorageReference ref = FirebaseStorage.getInstance().getReference().child("/user_avatars").child(authorId);
+            // ĐÃ SỬA: Xóa dấu / ở đầu "user_avatars"
+            StorageReference ref = FirebaseStorage.getInstance().getReference().child("user_avatars").child(authorId);
             Glide.with(itemView.getContext()).load(ref).placeholder(R.drawable.splash_background).circleCrop().into(imvAvatar);
 
             if (videoListener != null) videoListener.remove();
             videoListener = db.collection("videos").document(videoId).addSnapshotListener((doc, e) -> {
                 if (e != null || doc == null || !doc.exists()) return;
-                totalLikes = doc.getLong("totalLikes") != null ? doc.getLong("totalLikes").intValue() : 0;
-                totalComments = doc.getLong("totalComments") != null ? doc.getLong("totalComments").intValue() : 0;
-                tvFavorites.setText(String.valueOf(totalLikes));
-                tvComment.setText(String.valueOf(totalComments));
+                tvFavorites.setText(String.valueOf(doc.getLong("totalLikes") != null ? doc.getLong("totalLikes").intValue() : 0));
+                tvComment.setText(String.valueOf(doc.getLong("totalComments") != null ? doc.getLong("totalComments").intValue() : 0));
             });
 
             db.collection("likes").document(currentUserId + "_" + videoId).addSnapshotListener((doc, e) -> {
@@ -275,40 +224,29 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
             });
         }
 
-        @Override
-        public void onClick(View v) {
+        @Override public void onClick(View v) {
             int id = v.getId();
-            if (id == R.id.videoView) {
-                if (isPlaying) pauseVideo(); else playVideo();
-            } else if (id == R.id.imvAvatar || id == R.id.tvTitle) {
-                moveToProfile(authorId);
-            } else if (id == R.id.tvComment) {
-                showComments();
-            } else if (id == R.id.tvFavorites) {
-                toggleLike();
-            } else if (id == R.id.imvVolume) {
-                toggleVolume();
-            } else if (id == R.id.imvShare) {
-                shareVideo();
-            } else if (id == R.id.imvMore) {
-                showMoreOptions();
-            }
+            if (id == R.id.videoView) { if (isPlaying) pauseVideo(); else playVideo(); }
+            else if (id == R.id.imvAvatar || id == R.id.tvTitle) moveToProfile(authorId);
+            else if (id == R.id.tvComment) showComments();
+            else if (id == R.id.tvFavorites) toggleLike();
+            else if (id == R.id.imvVolume) toggleVolume();
+            else if (id == R.id.imvShare) shareVideo();
+            else if (id == R.id.imvMore) showMoreOptions();
         }
 
         private void showMoreOptions() {
             boolean isOwner = currentUserId.equals(authorId);
             String[] options = isOwner ? new String[]{"Copy Link", "Delete Video"} : new String[]{"Copy Link", "Report"};
-            
-            new AlertDialog.Builder(context)
-                    .setItems(options, (dialog, which) -> {
-                        if (which == 0) {
-                            ClipboardManager cb = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-                            cb.setPrimaryClip(ClipData.newPlainText("Link", "video_id:" + videoId));
-                            Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show();
-                        } else if (which == 1) {
-                            if (isOwner) openDeleteActivity(); else Toast.makeText(context, "Reported", Toast.LENGTH_SHORT).show();
-                        }
-                    }).show();
+            new AlertDialog.Builder(context).setItems(options, (dialog, which) -> {
+                if (which == 0) {
+                    ClipboardManager cb = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+                    cb.setPrimaryClip(ClipData.newPlainText("Link", "video_id:" + videoId));
+                    Toast.makeText(context, "Link copied", Toast.LENGTH_SHORT).show();
+                } else if (which == 1) {
+                    if (isOwner) openDeleteActivity(); else Toast.makeText(context, "Reported", Toast.LENGTH_SHORT).show();
+                }
+            }).show();
         }
 
         private void openDeleteActivity() {
@@ -322,44 +260,13 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
             if (currentUser == null) return;
             DocumentReference likeRef = db.collection("likes").document(currentUserId + "_" + videoId);
             DocumentReference videoRef = db.collection("videos").document(videoId);
-            if (isLiked) {
-                likeRef.delete();
-                videoRef.update("totalLikes", FieldValue.increment(-1));
-            } else {
-                Map<String, Object> like = new HashMap<>();
-                like.put("userId", currentUserId);
-                like.put("videoId", videoId);
-                likeRef.set(like);
-                videoRef.update("totalLikes", FieldValue.increment(1));
-                if (!currentUserId.equals(authorId)) Notification.pushNotification(currentUserId, authorId, "like");
-            }
+            if (isLiked) { likeRef.delete(); videoRef.update("totalLikes", FieldValue.increment(-1)); }
+            else { Map<String, Object> like = new HashMap<>(); like.put("userId", currentUserId); like.put("videoId", videoId); likeRef.set(like); videoRef.update("totalLikes", FieldValue.increment(1)); if (!currentUserId.equals(authorId)) Notification.pushNotification(currentUserId, authorId, "like"); }
         }
 
-        private void toggleVolume() {
-            if (exoPlayer == null) return;
-            boolean isMuted = exoPlayer.getVolume() == 0;
-            exoPlayer.setVolume(isMuted ? 1.0f : 0f);
-            imvVolume.setImageResource(isMuted ? R.drawable.ic_baseline_volume_up_24 : R.drawable.ic_baseline_volume_off_24);
-        }
-
-        private void showComments() {
-            Intent intent = new Intent(context, CommentActivity.class);
-            intent.putExtra("videoId", videoId);
-            intent.putExtra("authorId", authorId);
-            context.startActivity(intent);
-        }
-
-        private void shareVideo() {
-            Intent intent = new Intent(Intent.ACTION_SEND);
-            intent.setType("text/plain");
-            intent.putExtra(Intent.EXTRA_TEXT, "Watch this video!");
-            context.startActivity(Intent.createChooser(intent, "Share"));
-        }
-
-        private void moveToProfile(String uid) {
-            Intent intent = new Intent(context, ProfileActivity.class);
-            intent.putExtra("uid", uid);
-            context.startActivity(intent);
-        }
+        private void toggleVolume() { if (exoPlayer != null) { boolean isMuted = exoPlayer.getVolume() == 0; exoPlayer.setVolume(isMuted ? 1.0f : 0f); imvVolume.setImageResource(isMuted ? R.drawable.ic_baseline_volume_up_24 : R.drawable.ic_baseline_volume_off_24); } }
+        private void showComments() { Intent intent = new Intent(context, CommentActivity.class); intent.putExtra("videoId", videoId); intent.putExtra("authorId", authorId); context.startActivity(intent); }
+        private void shareVideo() { Intent intent = new Intent(Intent.ACTION_SEND); intent.setType("text/plain"); intent.putExtra(Intent.EXTRA_TEXT, "Watch this video!"); context.startActivity(Intent.createChooser(intent, "Share")); }
+        private void moveToProfile(String uid) { Intent intent = new Intent(context, ProfileActivity.class); intent.putExtra("uid", uid); context.startActivity(intent); }
     }
 }

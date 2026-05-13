@@ -163,20 +163,9 @@ public class CommentActivity extends Activity implements View.OnClickListener{
                 });
 
         if (user != null) {
-//            docRef = db.collection("profiles").document(userId.toString());
-//            docRef.get().addOnCompleteListener(task -> {
-//                if (task.isSuccessful()){
-//                    DocumentSnapshot document = task.getResult();
-//                    if (document.exists())
-//                    {
-//                        try {
-//                            avatarName = (String) document.get("avatarName");
-//                        }catch(Exception e){
-//                            //do nothing
-//                        }
             userId = user.getUid();
-            StorageReference download = storageRef.child("/user_avatars").child(userId.toString());
-//                        StorageReference download = storageRef.child(userId.toString());
+            // ĐÃ SỬA: Xóa dấu / ở đầu path
+            StorageReference download = storageRef.child("user_avatars").child(userId.toString());
 
             download.getBytes(StaticVariable.MAX_BYTES_AVATAR)
                     .addOnSuccessListener(new OnSuccessListener<byte[]>() {
@@ -192,15 +181,9 @@ public class CommentActivity extends Activity implements View.OnClickListener{
                             // Do nothing
                         }
                     });
-//                    }
-//                    else { }
-//                }
-//                else { }
-//            });
         }
         else
         {
-//            Toast.makeText(this, "You have to sign in to comment.", Toast.LENGTH_SHORT).show();
             Intent intent1 = new Intent(CommentActivity.this, HomeScreenActivity.class);
             startActivity(intent1);
         }
@@ -222,7 +205,6 @@ public class CommentActivity extends Activity implements View.OnClickListener{
             String cmt = edtComment.getText().toString().trim();
             if (TextUtils.isEmpty(cmt))
             {
-//                Toast.makeText(this, "Comment is empty...", Toast.LENGTH_SHORT).show();
                 return;
             }
             String timeStamp = String.valueOf(System.currentTimeMillis());
@@ -241,7 +223,6 @@ public class CommentActivity extends Activity implements View.OnClickListener{
                 if (task.isSuccessful()){
                     Notification.pushNotification(username, authorVideoId, StaticVariable.COMMENT);
                     handler.post(CommentActivity.this::updateTotal);
-//                    Toast.makeText(CommentActivity.this, "Comment successfully!", Toast.LENGTH_SHORT).show();
                 }
                 else{
                     Toast.makeText(CommentActivity.this, "Comment fail!", Toast.LENGTH_SHORT).show();

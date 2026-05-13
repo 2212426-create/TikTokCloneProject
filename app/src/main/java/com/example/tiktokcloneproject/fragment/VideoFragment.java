@@ -1,7 +1,6 @@
 package com.example.tiktokcloneproject.fragment;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -21,6 +20,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
 
@@ -101,7 +101,9 @@ public class VideoFragment extends Fragment {
     private void loadVideos() {
         if (db == null) return;
         
+        // Sắp xếp theo timestamp giảm dần để video mới nhất hiện lên đầu
         videoListener = db.collection("videos")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(10)
                 .addSnapshotListener((snapshots, e) -> {
                     if (e != null) {
@@ -116,14 +118,34 @@ public class VideoFragment extends Fragment {
                         boolean isFirstLoad = videos.isEmpty();
                         
                         for (DocumentChange dc : snapshots.getDocumentChanges()) {
-                            if (dc.getType() == DocumentChange.Type.ADDED) {
-                                Video video = dc.getDocument().toObject(Video.class);
-                                videos.add(video);
-                                videoAdapter.notifyItemInserted(videos.size() - 1);
+                            Video video = dc.getDocument().toObject(Video.class);
+                            int newIndex = dc.getNewIndex();
+                            int oldIndex = dc.getOldIndex();
+                            
+                            switch (dc.getType()) {
+                                case ADDED:
+                                    videos.add(newIndex, video);
+                                    videoAdapter.notifyItemInserted(newIndex);
+                                    break;
+                                case MODIFIED:
+                                    if (oldIndex == newIndex) {
+                                        videos.set(newIndex, video);
+                                        videoAdapter.notifyItemChanged(newIndex);
+                                    } else {
+                                        videos.remove(oldIndex);
+                                        videos.add(newIndex, video);
+                                        videoAdapter.notifyItemMoved(oldIndex, newIndex);
+                                        videoAdapter.notifyItemChanged(newIndex);
+                                    }
+                                    break;
+                                case REMOVED:
+                                    videos.remove(oldIndex);
+                                    videoAdapter.notifyItemRemoved(oldIndex);
+                                    break;
                             }
                         }
                         
-                        // Nếu là lần đầu load, tự động play video đầu tiên sau khi adapter cập nhật
+                        // Nếu là lần đầu load, tự động play video đầu tiên
                         if (isFirstLoad && !videos.isEmpty()) {
                             viewPager2.post(() -> {
                                 if (videoAdapter != null) videoAdapter.playVideo(0);
