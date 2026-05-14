@@ -25,14 +25,14 @@ public class GlobalVariable extends Application {
         super.onCreate();
         
         try {
-            // Cấu hình Firestore an toàn
+            // Cấu hình Firestore
             FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder()
                     .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
                     .build();
             FirebaseFirestore.getInstance().setFirestoreSettings(settings);
             
-            // Cấu hình Realtime Database
-            FirebaseDatabase.getInstance().setPersistenceEnabled(true);
+            // Cấu hình Realtime Database với URL chính xác thông qua FirebaseHelper
+            FirebaseHelper.getDatabase().setPersistenceEnabled(true);
         } catch (Exception e) {
             Log.e("FirebaseInit", "Lỗi khởi tạo Firebase: " + e.getMessage());
         }

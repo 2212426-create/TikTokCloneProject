@@ -18,7 +18,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -27,14 +26,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.example.tiktokcloneproject.activity.EditProfileActivity;
 import com.example.tiktokcloneproject.activity.FollowListActivity;
-import com.example.tiktokcloneproject.activity.FullScreenAvatarActivity;
 import com.example.tiktokcloneproject.activity.HomeScreenActivity;
 import com.example.tiktokcloneproject.activity.MainActivity;
 import com.example.tiktokcloneproject.R;
@@ -42,23 +40,14 @@ import com.example.tiktokcloneproject.activity.SettingsAndPrivacyActivity;
 import com.example.tiktokcloneproject.adapters.VideoSummaryAdapter;
 import com.example.tiktokcloneproject.helper.StaticVariable;
 import com.example.tiktokcloneproject.model.VideoSummary;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInClient;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
-import com.google.firebase.firestore.QuerySnapshot;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -72,17 +61,13 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
     private Button btn, btnEditProfile, btnUpdateBio, btnCancelUpdateBio;
     private LinearLayout llFollowing, llFollowers;
     ImageView imvAvatarProfile;
-    Uri avatarUri;
     FirebaseFirestore db;
     FirebaseAuth mAuth;
     FirebaseUser user;
-    FirebaseStorage storage;
-    StorageReference storageReference;
-    Bitmap bitmap;
     String userId;
     DocumentReference docRef;
     String oldBioText, currentUserID;
-    String TAG = "test";
+    String TAG = "ProfileFragment";
     RecyclerView recVideoSummary;
     ArrayList<VideoSummary> videoSummaries;
     View layout;
@@ -146,8 +131,6 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
         if (txvMenu != null) txvMenu.setOnClickListener(this);
         if (imvAvatarProfile != null) imvAvatarProfile.setOnClickListener(this);
 
-        storage = FirebaseStorage.getInstance();
-        storageReference = storage.getReference();
         db = FirebaseFirestore.getInstance();
 
         if (user != null) {
@@ -158,7 +141,6 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             setLikes(userId);
             docRef = db.collection("profiles").document(userId);
             if (user != null && userId.equals(user.getUid())) {
-                // Vào profile của mình
                 if (btnEditProfile != null) {
                     btnEditProfile.setVisibility(View.VISIBLE);
                     btnEditProfile.setOnClickListener(this);
@@ -174,7 +156,6 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                 }
                 loadUserBio();
             } else {
-                // Vào profile người khác - hiển thị bio dạng read-only
                 if (edtBio != null) {
                     edtBio.setVisibility(View.VISIBLE);
                     edtBio.setEnabled(false);
@@ -213,6 +194,11 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                         if (txvLikes != null)
                             txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
                         if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
+                        
+                        String avatarUrl = document.getString("avatarUrl");
+                        if (avatarUrl != null && imvAvatarProfile != null) {
+                            Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
+                        }
                     }
                 }
             });
@@ -229,31 +215,35 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                     }
                 }
             });
-        } else if (user == null) {
-            btn.setOnClickListener(view -> {
-                Intent intentMain = new Intent(context != null ? context : getActivity(), MainActivity.class);
-                startActivity(intentMain);
-            });
         }
     }
 
     protected void setVideoSummaries() {
         if (userId == null || userId.isEmpty()) return;
 
-        db.collection("profiles").document(userId).collection("public_videos")
+        // BỎ orderBy ĐỂ TRÁNH LỖI THIẾU INDEX LÀM MẤT VIDEO
+        db.collection("videos")
+                .whereEqualTo("authorId", userId)
                 .get()
                 .addOnCompleteListener(task -> {
                     if (isAdded() && task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot document : task.getResult()) {
+                            String thumb = document.getString("videoUri");
+                            if (thumb == null || thumb.isEmpty()) {
+                                thumb = document.getString("thumbnailUri");
+                            }
+                            
                             videoSummaries.add(new VideoSummary(document.getString("videoId"),
-                                    document.getString("thumbnailUri"),
+                                    thumb,
                                     document.getLong("watchCount")));
                         }
-                        if (videoSummaries.size() > 0 && recVideoSummary != null) {
+                        if (recVideoSummary != null) {
                             VideoSummaryAdapter videoSummaryAdapter = new VideoSummaryAdapter(context != null ? context : getActivity(), videoSummaries);
                             recVideoSummary.setAdapter(videoSummaryAdapter);
                         }
+                    } else {
+                        Log.e(TAG, "Error fetching videos", task.getException());
                     }
                 });
     }
@@ -273,11 +263,16 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                         if (txvLikes != null)
                             txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
                         if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
-                        // Load bio cho cả 2 trường hợp: profile mình và người khác
+                        
                         String bio = document.getString("bio");
                         if (bio != null && edtBio != null) {
                             oldBioText = bio;
                             edtBio.setText(bio);
+                        }
+
+                        String avatarUrl = document.getString("avatarUrl");
+                        if (avatarUrl != null && imvAvatarProfile != null) {
+                            Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
                         }
                     }
                 }
@@ -295,7 +290,7 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                         edtBio.setText(bio);
                     }
                 }
-            }).addOnFailureListener(e -> Log.e(TAG, "Error loading bio", e));
+            });
         }
     }
 
@@ -304,10 +299,8 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
         int id = v.getId();
         if (id == R.id.text_menu) {
             showDialog();
-        } else if (id == R.id.imvAvatarProfile) {
-            showShareAccountDialog();
         } else if (id == R.id.button_edit_profile) {
-            moveToAnotherActivity(EditProfileActivity.class);
+            startActivity(new Intent(context != null ? context : getActivity(), EditProfileActivity.class));
         } else if (id == R.id.btn_update_bio) {
             updateBio();
         } else if (id == R.id.btn_cancel_update_bio) {
@@ -329,51 +322,8 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             docRef.update("bio", newBio)
                     .addOnSuccessListener(aVoid -> {
                         oldBioText = newBio;
-                        if (context != null) {
-                            Toast.makeText(context, "Bio updated successfully", Toast.LENGTH_SHORT).show();
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        if (context != null) {
-                            Toast.makeText(context, "Failed to update bio", Toast.LENGTH_SHORT).show();
-                        }
-                        Log.e(TAG, "Error updating bio", e);
+                        if (context != null) Toast.makeText(context, "Bio updated", Toast.LENGTH_SHORT).show();
                     });
-        }
-    }
-
-    private void showShareAccountDialog() {
-        final Dialog dialog = new Dialog(context != null ? context : getActivity());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.share_account_layout);
-
-        TextView txvUsernameInSharedPlace = dialog.findViewById(R.id.txvUsernameInSharedPlace);
-        ImageView imvAvatarInSharedPlace = dialog.findViewById(R.id.imvAvatarInSharedPlace);
-        Button btnCopyURL = dialog.findViewById(R.id.btnCopyURL);
-        TextView txvCancelInSharedPlace = dialog.findViewById(R.id.txvCancelInSharedPlace);
-
-        if (bitmap != null && imvAvatarInSharedPlace != null)
-            imvAvatarInSharedPlace.setImageBitmap(bitmap);
-        if (txvUsernameInSharedPlace != null && txvUserName != null)
-            txvUsernameInSharedPlace.setText(txvUserName.getText());
-
-        if (btnCopyURL != null) {
-            btnCopyURL.setOnClickListener(view -> {
-                ClipboardManager clipboard = (ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("toptop-link", "http://toptoptoptop.com/" + userId);
-                clipboard.setPrimaryClip(clip);
-                Toast.makeText(context != null ? context : getActivity(), "Profile link copied", Toast.LENGTH_SHORT).show();
-            });
-        }
-
-        if (txvCancelInSharedPlace != null) txvCancelInSharedPlace.setOnClickListener(view -> dialog.cancel());
-
-        dialog.show();
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setGravity(Gravity.BOTTOM);
         }
     }
 
@@ -405,10 +355,6 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             window.setGravity(Gravity.BOTTOM);
         }
-    }
-
-    private void moveToAnotherActivity(Class<?> cls) {
-        startActivity(new Intent(context != null ? context : getActivity(), cls));
     }
 
     private void handleUnfollowed() {
@@ -452,16 +398,18 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
     @Override
     public void onResume() {
         super.onResume();
-        if (userId != null && !userId.isEmpty() && storageReference != null) {
-            // ĐÃ SỬA: Xóa dấu / ở đầu "user_avatars"
-            storageReference.child("user_avatars").child(userId).getBytes(StaticVariable.MAX_BYTES_AVATAR)
-                    .addOnSuccessListener(bytes -> {
-                        if (isAdded()) {
-                            bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                            if (imvAvatarProfile != null) imvAvatarProfile.setImageBitmap(bitmap);
-                        }
-                    });
+        if (userId != null && !userId.isEmpty()) {
             setVideoSummaries();
+            if (docRef != null) {
+                docRef.get().addOnSuccessListener(document -> {
+                    if (isAdded() && document.exists()) {
+                        String avatarUrl = document.getString("avatarUrl");
+                        if (avatarUrl != null && imvAvatarProfile != null) {
+                            Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
+                        }
+                    }
+                });
+            }
         }
     }
 

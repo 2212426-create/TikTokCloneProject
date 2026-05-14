@@ -9,6 +9,7 @@ import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.example.tiktokcloneproject.R;
@@ -26,9 +27,6 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.util.HashMap;
-import java.util.Map;
-
 public class EmailSignupActivity extends AppCompatActivity {
 
     private static final String TAG = "EmailSignUpActivity";
@@ -37,6 +35,8 @@ public class EmailSignupActivity extends AppCompatActivity {
     private FirebaseFirestore db;
     private GoogleSignInClient mGoogleSignInClient;
     private Dialog dialog;
+    private ImageView btnBack;
+    
     private final ActivityResultLauncher<Intent> googleSignInLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 Intent data = result.getData();
@@ -60,7 +60,10 @@ public class EmailSignupActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_email_signin); 
+        setContentView(R.layout.activity_email_signup); 
+
+        btnBack = findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(v -> finish());
 
         mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
@@ -96,7 +99,6 @@ public class EmailSignupActivity extends AppCompatActivity {
                                 username = "user_" + id.substring(0, 5);
                             }
                             
-                            // Tạo user và profile đồng thời
                             User user = new User(id, username, "", firebaseUser.getEmail());
                             db.collection("users").document(id).set(user.toMap());
                             

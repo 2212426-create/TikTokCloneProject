@@ -5,7 +5,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -41,6 +40,7 @@ import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -56,10 +56,15 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
     private Context context;
     private int currentPosition = 0;
     private final Map<Integer, VideoViewHolder> activeHolders = new HashMap<>();
+    private FirebaseUser mUser;
 
     public VideoAdapter(Context context, List<Video> videos) {
         this.context = context;
         this.videos = videos;
+    }
+
+    public void setUser(FirebaseUser user) {
+        mUser = user;
     }
 
     @NonNull
@@ -95,16 +100,11 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
     public int getItemCount() { return videos != null ? videos.size() : 0; }
 
     public void updateCurrentPosition(int pos) { this.currentPosition = pos; }
-    public int getCurrentPosition() { return currentPosition; }
-    public static void setUser(FirebaseUser user) {}
 
-    public void updateWatchCount(int position) {
-        if (videos != null && position >= 0 && position < videos.size()) {
-            String videoId = videos.get(position).getVideoId();
-            FirebaseFirestore.getInstance().collection("videos").document(videoId).update("watchCount", FieldValue.increment(1));
-        }
+    public int getCurrentPosition() {
+        return currentPosition;
     }
-
+    
     public void pauseVideo(int position) {
         VideoViewHolder holder = activeHolders.get(position);
         if (holder != null) holder.pauseVideo();
@@ -115,18 +115,26 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
         if (holder != null) holder.playVideo();
     }
 
+    public void updateWatchCount(int position) {
+        if (videos != null && position >= 0 && position < videos.size()) {
+            String videoId = videos.get(position).getVideoId();
+            FirebaseFirestore.getInstance().collection("videos").document(videoId)
+                    .update("watchCount", FieldValue.increment(1));
+        }
+    }
+
     public class VideoViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
         StyledPlayerView videoView;
         ExoPlayer exoPlayer;
-        ImageView imvAvatar, imvPause, imvMore, imvAppear, imvVolume, imvShare;
+        ImageView imvAvatar, imvPause, imvMore, imvVolume, imvShare;
         TextView txvDescription, tvTitle, tvComment, tvFavorites;
         ProgressBar pbLoading;
         String authorId, videoId, currentUserId;
         int totalLikes, totalComments;
         boolean isLiked = false, isPlaying = false;
         FirebaseFirestore db = FirebaseFirestore.getInstance();
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         ListenerRegistration videoListener;
+        private final String TAG_VH = "VideoViewHolder";
 
         public VideoViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -138,7 +146,6 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
             imvAvatar = itemView.findViewById(R.id.imvAvatar);
             imvPause = itemView.findViewById(R.id.imvPause);
             imvMore = itemView.findViewById(R.id.imvMore);
-            imvAppear = itemView.findViewById(R.id.imv_appear);
             imvVolume = itemView.findViewById(R.id.imvVolume);
             imvShare = itemView.findViewById(R.id.imvShare);
             pbLoading = itemView.findViewById(R.id.pbLoading);
@@ -189,12 +196,14 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
         @SuppressLint("ClickableViewAccessibility")
         public void setVideoObjects(Video video, int position) {
             if (video == null) return;
-            this.authorId = video.getAuthorId();
+            final String currentAuthorId = video.getAuthorId();
+            this.authorId = currentAuthorId;
             this.videoId = video.getVideoId();
             this.totalLikes = video.getTotalLikes();
             this.totalComments = video.getTotalComments();
-            this.currentUserId = (currentUser != null) ? currentUser.getUid() : "";
+            this.currentUserId = (mUser != null) ? mUser.getUid() : "";
 
+            // 1. Set initial data from Video document (fallback)
             tvTitle.setText("@" + (video.getUsername() != null ? video.getUsername() : "user"));
             txvDescription.setText(video.getDescription());
             tvComment.setText(String.valueOf(totalComments));
@@ -207,9 +216,47 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
                 exoPlayer.setPlayWhenReady(position == currentPosition);
             }
 
-            // ĐÃ SỬA: Xóa dấu / ở đầu "user_avatars"
-            StorageReference ref = FirebaseStorage.getInstance().getReference().child("user_avatars").child(authorId);
-            Glide.with(itemView.getContext()).load(ref).placeholder(R.drawable.splash_background).circleCrop().into(imvAvatar);
+            // 2. Set default avatar while fetching latest from Profile
+            imvAvatar.setImageResource(R.drawable.default_avatar);
+
+            // 3. SYNC: Fetch Latest Username and Avatar from Profile collection
+            if (currentAuthorId != null && !currentAuthorId.isEmpty()) {
+                db.collection("profiles").document(currentAuthorId).get().addOnCompleteListener(task -> {
+                    // Safety check: has the ViewHolder been recycled to a different author?
+                    if (!currentAuthorId.equals(this.authorId)) return;
+
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        DocumentSnapshot doc = task.getResult();
+                        if (doc.exists()) {
+                            // Update Username (Syncing from Image 1 to Image 2)
+                            String latestUsername = doc.getString("username");
+                            if (latestUsername != null && !latestUsername.isEmpty()) {
+                                tvTitle.setText("@" + latestUsername);
+                            }
+
+                            // Update Avatar URL
+                            String avatarUrl = doc.getString("avatarUrl");
+                            if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = doc.getString("avatarName");
+                            if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = doc.getString("avatarUri");
+
+                            if (avatarUrl != null && !avatarUrl.isEmpty()) {
+                                Glide.with(itemView.getContext())
+                                        .load(avatarUrl)
+                                        .placeholder(R.drawable.default_avatar)
+                                        .error(R.drawable.default_avatar)
+                                        .circleCrop()
+                                        .into(imvAvatar);
+                            } else {
+                                loadOldStorageAvatar(currentAuthorId);
+                            }
+                        } else {
+                            loadOldStorageAvatar(currentAuthorId);
+                        }
+                    } else {
+                        loadOldStorageAvatar(currentAuthorId);
+                    }
+                });
+            }
 
             if (videoListener != null) videoListener.remove();
             videoListener = db.collection("videos").document(videoId).addSnapshotListener((doc, e) -> {
@@ -222,6 +269,17 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
                 isLiked = doc != null && doc.exists();
                 tvFavorites.setCompoundDrawablesWithIntrinsicBounds(0, isLiked ? R.drawable.ic_fill_favorite : R.drawable.ic_favorite, 0, 0);
             });
+        }
+
+        private void loadOldStorageAvatar(String uid) {
+            if (uid == null || uid.isEmpty()) return;
+            StorageReference ref = FirebaseStorage.getInstance().getReference().child("user_avatars").child(uid);
+            Glide.with(itemView.getContext())
+                    .load(ref)
+                    .placeholder(R.drawable.default_avatar)
+                    .error(R.drawable.default_avatar)
+                    .circleCrop()
+                    .into(imvAvatar);
         }
 
         @Override public void onClick(View v) {
@@ -257,7 +315,7 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
         }
 
         private void toggleLike() {
-            if (currentUser == null) return;
+            if (mUser == null) return;
             DocumentReference likeRef = db.collection("likes").document(currentUserId + "_" + videoId);
             DocumentReference videoRef = db.collection("videos").document(videoId);
             if (isLiked) { likeRef.delete(); videoRef.update("totalLikes", FieldValue.increment(-1)); }
@@ -267,6 +325,10 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
         private void toggleVolume() { if (exoPlayer != null) { boolean isMuted = exoPlayer.getVolume() == 0; exoPlayer.setVolume(isMuted ? 1.0f : 0f); imvVolume.setImageResource(isMuted ? R.drawable.ic_baseline_volume_up_24 : R.drawable.ic_baseline_volume_off_24); } }
         private void showComments() { Intent intent = new Intent(context, CommentActivity.class); intent.putExtra("videoId", videoId); intent.putExtra("authorId", authorId); context.startActivity(intent); }
         private void shareVideo() { Intent intent = new Intent(Intent.ACTION_SEND); intent.setType("text/plain"); intent.putExtra(Intent.EXTRA_TEXT, "Watch this video!"); context.startActivity(Intent.createChooser(intent, "Share")); }
-        private void moveToProfile(String uid) { Intent intent = new Intent(context, ProfileActivity.class); intent.putExtra("uid", uid); context.startActivity(intent); }
+        private void moveToProfile(String uid) { 
+            Intent intent = new Intent(context, ProfileActivity.class); 
+            intent.putExtra("id", uid);
+            context.startActivity(intent); 
+        }
     }
 }

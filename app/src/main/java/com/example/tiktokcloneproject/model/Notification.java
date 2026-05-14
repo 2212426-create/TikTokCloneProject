@@ -1,5 +1,6 @@
 package com.example.tiktokcloneproject.model;
 
+import com.example.tiktokcloneproject.helper.FirebaseHelper;
 import com.google.firebase.database.FirebaseDatabase;
 
 public class Notification {
@@ -30,8 +31,9 @@ public class Notification {
     }
 
     public static void pushNotification(String fromUsername, String toUserId, String action) {
-        FirebaseDatabase.getInstance()
+        FirebaseHelper.getDatabase()
                         .getReference()
+                        .child("Notifications") // Đã thêm nút Notifications để gom nhóm dữ liệu
                         .child(toUserId)
                         .push()
                         .setValue(new Notification(fromUsername, action)

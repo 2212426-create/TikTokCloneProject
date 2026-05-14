@@ -13,6 +13,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
 import com.example.tiktokcloneproject.R;
 import com.example.tiktokcloneproject.activity.VideoActivity;
 import com.example.tiktokcloneproject.model.VideoSummary;
@@ -52,19 +53,39 @@ public class VideoSummaryAdapter extends RecyclerView.Adapter<VideoSummaryAdapte
         
         if (holder.thumbnail != null && item.getThumbnailUri() != null && !item.getThumbnailUri().isEmpty()) {
             try {
-                StorageReference ref = null;
-                if (item.getThumbnailUri().startsWith("gs://") || item.getThumbnailUri().startsWith("https://")) {
-                    ref = FirebaseStorage.getInstance().getReferenceFromUrl(item.getThumbnailUri());
+                String thumbUri = item.getThumbnailUri();
+                Object loadTarget;
+                boolean isVideo = thumbUri.toLowerCase().endsWith(".mp4");
+                
+                // Cloudinary: Get the very first frame (so_0) as requested
+                if (thumbUri.contains("cloudinary.com") && isVideo) {
+                    thumbUri = thumbUri.replace(".mp4", ".jpg");
+                    if (thumbUri.contains("/upload/")) {
+                        thumbUri = thumbUri.replace("/upload/", "/upload/so_0/");
+                    }
+                    loadTarget = thumbUri;
+                } else if (thumbUri.startsWith("gs://")) {
+                    loadTarget = FirebaseStorage.getInstance().getReferenceFromUrl(thumbUri);
+                } else if (thumbUri.startsWith("https://") && thumbUri.contains("firebasestorage.googleapis.com")) {
+                    loadTarget = FirebaseStorage.getInstance().getReferenceFromUrl(thumbUri);
                 } else {
-                    ref = FirebaseStorage.getInstance().getReference().child(item.getThumbnailUri());
+                    loadTarget = thumbUri;
                 }
 
                 if (mainContext != null) {
-                    Glide.with(mainContext)
-                            .load(ref)
+                    RequestOptions options = new RequestOptions()
                             .placeholder(R.drawable.splash_background)
                             .error(R.drawable.splash_background)
-                            .centerCrop()
+                            .centerCrop();
+                    
+                    // If not Cloudinary, tell Glide to extract first frame (0)
+                    if (isVideo && !thumbUri.contains("cloudinary.com")) {
+                        options = options.frame(0);
+                    }
+
+                    Glide.with(mainContext)
+                            .load(loadTarget)
+                            .apply(options)
                             .into(holder.thumbnail);
                 }
             } catch (Exception e) {

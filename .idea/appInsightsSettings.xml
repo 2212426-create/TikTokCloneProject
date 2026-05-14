@@ -7,14 +7,6 @@
         <entry key="Firebase Crashlytics">
           <value>
             <InsightsFilterSettings>
-              <option name="connection">
-                <ConnectionSetting>
-                  <option name="appId" value="com.example.tiktokcloneproject" />
-                  <option name="mobileSdkAppId" value="1:451392714870:android:1b357375d7b6f300a44757" />
-                  <option name="projectId" value="mytiktokclone-f9789" />
-                  <option name="projectNumber" value="451392714870" />
-                </ConnectionSetting>
-              </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
               <option name="timeIntervalDays" value="THIRTY_DAYS" />
               <option name="visibilityType" value="ALL" />

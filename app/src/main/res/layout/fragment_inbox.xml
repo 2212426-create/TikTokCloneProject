@@ -6,41 +6,98 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?android:attr/colorPrimary"
-    tools:context="com.example.tiktokcloneproject.activity.InboxActivity">
+    android:background="@color/white">
 
-    <FrameLayout
+    <!-- Header -->
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:id="@+id/blank_notification">
+        android:layout_height="?attr/actionBarSize"
+        android:paddingHorizontal="16dp">
         <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/ic_inbox"
+            app:tint="@color/black" />
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp"
-            android:src="@drawable/ic_blank"></ImageView>
-        <TextView
-            android:layout_width="200dp"
-            android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:textColor="?attr/colorOnPrimary"
-            android:fontFamily="@font/montserrat_bold"
-            android:text="You don't have any notification yet"
-            android:textSize="14dp"></TextView>
-        </LinearLayout>
-        <ListView
-            android:id="@+id/lvNotifications"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:divider="@null"
-            android:layout_weight="1"
-            android:scrollbarSize="3dp"
-            android:padding="8dp"
-            />
+            android:layout_centerInParent="true"
+            android:text="Hộp thư"
+            android:textColor="@color/black"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/ic_search"
+            app:tint="@color/black" />
+    </RelativeLayout>
 
-    </FrameLayout>
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Active Users Horizontal List -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvActiveUsers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                tools:listitem="@layout/item_active_user"
+                android:paddingVertical="8dp"
+                android:clipToPadding="false"
+                android:paddingHorizontal="8dp"/>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#F1F1F1"
+                android:layout_marginHorizontal="16dp"/>
+
+            <!-- Chat List -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="400dp">
+
+                <LinearLayout
+                    android:id="@+id/blank_notification"
+                    android:layout_width="match_parent"
+                    android:layout_height="300dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:visibility="gone">
+                    <ImageView
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:src="@drawable/ic_inbox"
+                        app:tint="#D1D1D1" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Chưa có tin nhắn nào"
+                        android:textColor="#8A8A8E"
+                        android:layout_marginTop="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvInboxChats"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:nestedScrollingEnabled="false"
+                    tools:listitem="@layout/item_chat_user" />
+            </FrameLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

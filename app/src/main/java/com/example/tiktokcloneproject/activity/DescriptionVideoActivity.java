@@ -51,7 +51,7 @@ import java.util.regex.Pattern;
 public class DescriptionVideoActivity extends FragmentActivity implements View.OnClickListener {
     EditText edtDescription;
     Button btnDescription;
-    ImageView imvShortCutVideo;
+    ImageView imvShortCutVideo, btnBack;
     final String REGEX_HASHTAG = "#([A-Za-z0-9_-]+)";
 
     String username = "user";
@@ -83,6 +83,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         edtDescription = findViewById(R.id.edtDescription);
         btnDescription = findViewById(R.id.btnDescription);
         imvShortCutVideo = findViewById(R.id.imvShortCutVideo);
+        btnBack = findViewById(R.id.btnBack);
 
         mAuth = FirebaseAuth.getInstance();
         user = mAuth.getCurrentUser();
@@ -109,6 +110,9 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                 .setOngoing(true);
 
         btnDescription.setOnClickListener(this);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
     }
 
     private void safeNotify() {
@@ -282,9 +286,18 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
 
         db.collection("videos").document(Id).set(videoData);
 
+        // Derive thumbnail from video URL (Cloudinary specific)
+        String thumbUrl = "https://picsum.photos/200/300"; // Fallback
+        if (videoUrl.contains("cloudinary.com")) {
+            thumbUrl = videoUrl.replace(".mp4", ".jpg");
+            if (thumbUrl.contains("/upload/")) {
+                thumbUrl = thumbUrl.replace("/upload/", "/upload/so_0/");
+            }
+        }
+
         Map<String, Object> summaryData = new HashMap<>();
         summaryData.put("videoId", Id);
-        summaryData.put("thumbnailUri", "https://picsum.photos/200/300");
+        summaryData.put("thumbnailUri", thumbUrl);
         summaryData.put("watchCount", 0);
 
         db.collection("video_summaries").document(Id).set(summaryData);
@@ -294,7 +307,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
             Map<String, Object> h = new HashMap<>();
             h.put("hashtag", tag); 
             h.put("videoId", Id); 
-            h.put("thumbnailUri", "https://picsum.photos/200/300");
+            h.put("thumbnailUri", thumbUrl);
             db.collection("hashtags").add(h);
         }
     }

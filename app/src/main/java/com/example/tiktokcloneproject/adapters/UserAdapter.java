@@ -52,7 +52,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.userItems> imp
         if (user ==null) {
             return;
         }
-        holder.text_Username.setText(user.getUserName());
+        holder.text_Username.setText(user.getUsername());
         holder.layout_items.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -113,7 +113,7 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.userItems> imp
                 else {
                     List<User> list=new ArrayList<>();
                     for (User user : listUserOld){
-                        if (user.getUserName().toLowerCase().contains(srtSearch.toLowerCase())){
+                        if (user.getUsername() != null && user.getUsername().toLowerCase().contains(srtSearch.toLowerCase())){
                             list.add(user);
                         }
                     }

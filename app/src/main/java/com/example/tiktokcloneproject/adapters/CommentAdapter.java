@@ -1,8 +1,6 @@
 package com.example.tiktokcloneproject.adapters;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,12 +11,10 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.bumptech.glide.Glide;
 import com.example.tiktokcloneproject.R;
-import com.example.tiktokcloneproject.helper.StaticVariable;
 import com.example.tiktokcloneproject.model.Comment;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
 import java.util.List;
 
@@ -48,18 +44,25 @@ public class CommentAdapter extends ArrayAdapter<Comment> {
 
         tvContent.setText(comment.getContent());
 
-        FirebaseFirestore.getInstance().collection("users").document(comment.getAuthorId())
-                .get().addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        tvUsername.setText(task.getResult().getString("username"));
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        
+        // Lấy username và avatarUrl từ profile
+        db.collection("profiles").document(comment.getAuthorId())
+                .get().addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        tvUsername.setText(doc.getString("username"));
+                        String avatarUrl = doc.getString("avatarUrl");
+                        if (avatarUrl != null) {
+                            Glide.with(context)
+                                    .load(avatarUrl)
+                                    .placeholder(R.drawable.default_avatar)
+                                    .circleCrop()
+                                    .into(imvAvatar);
+                        } else {
+                            imvAvatar.setImageResource(R.drawable.default_avatar);
+                        }
                     }
                 });
-
-        StorageReference ref = FirebaseStorage.getInstance().getReference().child("user_avatars").child(comment.getAuthorId());
-        ref.getBytes(StaticVariable.MAX_BYTES_AVATAR).addOnSuccessListener(bytes -> {
-            Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            imvAvatar.setImageBitmap(bitmap);
-        }).addOnFailureListener(e -> imvAvatar.setImageResource(R.drawable.default_avatar));
 
         return convertView;
     }

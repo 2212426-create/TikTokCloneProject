@@ -66,7 +66,7 @@ public class VideoHomeScreenActivity extends Activity implements View.OnClickLis
         viewPager2 = findViewById(R.id.viewPager);
         videos = new ArrayList<>();
         videoAdapter = new VideoAdapter(this, videos);
-        VideoAdapter.setUser(user);
+        videoAdapter.setUser(user);
         viewPager2.setAdapter(videoAdapter);
         
         viewPager2.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {

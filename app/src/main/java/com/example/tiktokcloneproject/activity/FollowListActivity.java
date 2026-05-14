@@ -7,6 +7,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ImageView;
 
 import com.example.tiktokcloneproject.R;
 import com.example.tiktokcloneproject.adapters.ViewPagerAdapter;
@@ -20,11 +21,16 @@ public class FollowListActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_follow_list);
 
+        ImageView btnBack = findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(v -> finish());
 
         Bundle i = getIntent().getExtras();
-        int pageIndex = i.getInt("pageIndex");
+        int pageIndex = 0;
+        if (i != null) {
+            pageIndex = i.getInt("pageIndex");
+        }
+        
         ActionBar actionBar = getSupportActionBar();
-
         if (actionBar!=null) {
             actionBar.hide();
         }
@@ -35,7 +41,6 @@ public class FollowListActivity extends AppCompatActivity {
         ViewPagerAdapter adapter = new ViewPagerAdapter(this);
         viewPager2.setAdapter(adapter);
 
-
         tabLayout.setScrollPosition(pageIndex,0f,true);
         viewPager2.setCurrentItem(pageIndex);
 
@@ -43,7 +48,6 @@ public class FollowListActivity extends AppCompatActivity {
                 new TabLayoutMediator.TabConfigurationStrategy() {
                     @Override
                     public void onConfigureTab(@NonNull TabLayout.Tab tab, int position) {
-
                         if (position == 0) {
                             tab.setText("Following");
                         }

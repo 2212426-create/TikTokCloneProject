@@ -9,11 +9,13 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.ImageView;
 import android.widget.ListView;
 
 import com.example.tiktokcloneproject.R;
 import com.example.tiktokcloneproject.adapters.NotificationAdapter;
 import com.example.tiktokcloneproject.fragment.NavigationFragment;
+import com.example.tiktokcloneproject.helper.FirebaseHelper;
 import com.example.tiktokcloneproject.model.Notification;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -21,7 +23,6 @@ import com.google.firebase.database.ChildEventListener;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
 
 import java.util.ArrayList;
 
@@ -31,6 +32,7 @@ public class InboxActivity extends FragmentActivity {
     private FirebaseUser user;
     private ListView lvNotifications;
     private ArrayList<Notification> notifications;
+    private ImageView btnBack;
 
     FragmentTransaction ft;
     NavigationFragment navigation;
@@ -39,6 +41,9 @@ public class InboxActivity extends FragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_inbox);
+
+        btnBack = findViewById(R.id.btnBack);
+        btnBack.setOnClickListener(v -> finish());
 
         lvNotifications = (ListView) findViewById(R.id.lvNotifications);
         notifications = new ArrayList<>();
@@ -54,45 +59,40 @@ public class InboxActivity extends FragmentActivity {
         ft.commit();
 
         user = FirebaseAuth.getInstance().getCurrentUser();
-       mDatabase = FirebaseDatabase.getInstance().getReference();
+        
+        // Sử dụng FirebaseHelper để lấy đúng instance database
+        mDatabase = FirebaseHelper.getDatabase().getReference("Notifications");
 
         ChildEventListener childEventListener = new ChildEventListener() {
             @Override
             public void onChildAdded(DataSnapshot dataSnapshot, String previousChildName) {
                 Log.d(TAG, "onChildAdded:" + dataSnapshot.getKey());
 
-                // A new comment has been added, add it to the displayed list
                 Notification notification = dataSnapshot.getValue(Notification.class);
-//                Toast.makeText(InboxActivity.this, notification.getTimestamp() + "", Toast.LENGTH_SHORT).show();
-
-                findViewById(R.id.blank_notification).setVisibility(View.GONE);
-                adapter.insert(notification, 0);
-
-
-                // ...
+                if (notification != null) {
+                    View blank = findViewById(R.id.blank_notification);
+                    if (blank != null) blank.setVisibility(View.GONE);
+                    adapter.insert(notification, 0);
+                }
             }
 
             @Override
-            public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
-
-            }
+            public void onChildChanged(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
 
             @Override
-            public void onChildRemoved(@NonNull DataSnapshot snapshot) {
-
-            }
+            public void onChildRemoved(@NonNull DataSnapshot snapshot) {}
 
             @Override
-            public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {
-
-            }
+            public void onChildMoved(@NonNull DataSnapshot snapshot, @Nullable String previousChildName) {}
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-
+                Log.e(TAG, "Notification Error: " + error.getMessage());
             }
         };
 
-        mDatabase.child(user.getUid()).addChildEventListener(childEventListener);
+        if (user != null) {
+            mDatabase.child(user.getUid()).addChildEventListener(childEventListener);
+        }
     }
 }

@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.tiktokcloneproject.R;
@@ -12,6 +13,7 @@ import com.example.tiktokcloneproject.R;
 public class SigninChoiceActivity extends Activity implements View.OnClickListener {
     Button btnChoiceEmail;
     TextView txvTitle, txvAlt;
+    ImageView btnBack;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -21,10 +23,13 @@ public class SigninChoiceActivity extends Activity implements View.OnClickListen
         btnChoiceEmail = (Button) findViewById(R.id.btnChoiceEmail);
         txvTitle = (TextView) findViewById(R.id.txvTitle);
         txvAlt = (TextView) findViewById(R.id.txv_alternative);
+        btnBack = findViewById(R.id.btnBack);
 
         txvTitle.setText(getString(R.string.sign_in));
         txvAlt.setText(getString(R.string.sign_in_alt));
+        
         btnChoiceEmail.setOnClickListener(this);
+        btnBack.setOnClickListener(v -> finish());
     }
 
     @Override

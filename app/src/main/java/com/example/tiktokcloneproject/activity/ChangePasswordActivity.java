@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
@@ -41,6 +42,7 @@ public class ChangePasswordActivity extends FragmentActivity implements View.OnC
     private FragmentManager fm;
     private EditText edtOldPassword, edtNewPassword, edtConfirmPassword;
     private Button btnOldPassword, btnNewPassword;
+    private ImageView btnBack;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +57,11 @@ public class ChangePasswordActivity extends FragmentActivity implements View.OnC
         edtConfirmPassword = (EditText) llChangePassword.findViewById(R.id.edtConfirmPassword);
         btnOldPassword = (Button) llChangePassword.findViewById(R.id.btnOldPassword);
         btnNewPassword = (Button) llChangePassword.findViewById(R.id.btnNewPassword);
+        btnBack = findViewById(R.id.btnBack);
+
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> finish());
+        }
 
         fragmentWaiting = (Fragment) getSupportFragmentManager().findFragmentById(R.id.fragWaiting);
 

@@ -66,7 +66,7 @@ public class VideoFragment extends Fragment {
 
         videos = new ArrayList<>();
         videoAdapter = new VideoAdapter(context != null ? context : getActivity(), videos);
-        VideoAdapter.setUser(user);
+        videoAdapter.setUser(user);
         viewPager2.setAdapter(videoAdapter);
         
         viewPager2.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -101,10 +101,10 @@ public class VideoFragment extends Fragment {
     private void loadVideos() {
         if (db == null) return;
         
-        // Sắp xếp theo timestamp giảm dần để video mới nhất hiện lên đầu
+        // FIX: Thêm orderBy để hiện video mới nhất lên đầu và tăng limit
         videoListener = db.collection("videos")
                 .orderBy("timestamp", Query.Direction.DESCENDING)
-                .limit(10)
+                .limit(50)
                 .addSnapshotListener((snapshots, e) -> {
                     if (e != null) {
                         Log.e(TAG, "Lỗi tải video: " + e.getMessage());
@@ -121,11 +121,14 @@ public class VideoFragment extends Fragment {
                             Video video = dc.getDocument().toObject(Video.class);
                             int newIndex = dc.getNewIndex();
                             int oldIndex = dc.getOldIndex();
-                            
+
                             switch (dc.getType()) {
                                 case ADDED:
-                                    videos.add(newIndex, video);
-                                    videoAdapter.notifyItemInserted(newIndex);
+                                    // Chèn vào đúng vị trí Index để đảm bảo thứ tự thời gian
+                                    if (newIndex <= videos.size()) {
+                                        videos.add(newIndex, video);
+                                        videoAdapter.notifyItemInserted(newIndex);
+                                    }
                                     break;
                                 case MODIFIED:
                                     if (oldIndex == newIndex) {
@@ -139,13 +142,14 @@ public class VideoFragment extends Fragment {
                                     }
                                     break;
                                 case REMOVED:
-                                    videos.remove(oldIndex);
-                                    videoAdapter.notifyItemRemoved(oldIndex);
+                                    if (oldIndex < videos.size()) {
+                                        videos.remove(oldIndex);
+                                        videoAdapter.notifyItemRemoved(oldIndex);
+                                    }
                                     break;
                             }
                         }
                         
-                        // Nếu là lần đầu load, tự động play video đầu tiên
                         if (isFirstLoad && !videos.isEmpty()) {
                             viewPager2.post(() -> {
                                 if (videoAdapter != null) videoAdapter.playVideo(0);

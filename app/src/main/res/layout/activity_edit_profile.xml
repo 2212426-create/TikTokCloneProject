@@ -34,6 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="end"
             android:layout_marginEnd="16dp"
+            android:padding="8dp"
             android:text="Save"
             android:textColor="#FE2C55"
             android:textSize="16sp"
@@ -43,7 +44,6 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_above="@id/btnSaveProfile"
         android:layout_below="@id/toolbar">
 
         <LinearLayout
@@ -58,13 +58,10 @@
                 android:layout_gravity="center"
                 android:layout_marginTop="20dp">
 
-                <ImageButton
+                <de.hdodenhof.circleimageview.CircleImageView
                     android:id="@+id/imbPhoto"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:padding="0dp"
-                    android:scaleType="centerCrop"
                     android:src="@drawable/default_avatar" />
 
                 <ImageView
@@ -91,8 +88,11 @@
                 android:orientation="vertical">
 
                 <RelativeLayout
+                    android:id="@+id/rlUsername"
                     android:layout_width="match_parent"
-                    android:layout_height="60dp">
+                    android:layout_height="60dp"
+                    android:clickable="true"
+                    android:focusable="true">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -109,13 +109,12 @@
                         android:layout_toStartOf="@id/imbUsername"
                         android:text="user"
                         android:textColor="#8A8A8E" />
-                    <ImageButton
+                    <ImageView
                         android:id="@+id/imbUsername"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_next" />
                 </RelativeLayout>
 
@@ -145,8 +144,11 @@
                 <View android:layout_width="match_parent" android:layout_height="0.5dp" android:background="#E5E5EA" />
 
                 <RelativeLayout
+                    android:id="@+id/rlBirthdate"
                     android:layout_width="match_parent"
-                    android:layout_height="60dp">
+                    android:layout_height="60dp"
+                    android:clickable="true"
+                    android:focusable="true">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -163,30 +165,16 @@
                         android:layout_toStartOf="@id/imbBirthdate"
                         android:text="01/01/2000"
                         android:textColor="#8A8A8E" />
-                    <ImageButton
+                    <ImageView
                         android:id="@+id/imbBirthdate"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:background="?attr/selectableItemBackgroundBorderless"
                         android:src="@drawable/ic_next" />
                 </RelativeLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
-
-    <Button
-        android:id="@+id/btnSaveProfile"
-        android:layout_width="match_parent"
-        android:layout_height="55dp"
-        android:layout_alignParentBottom="true"
-        android:layout_margin="16dp"
-        android:backgroundTint="#FE2C55"
-        android:text="SAVE CHANGES"
-        android:textColor="@color/white"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:cornerRadius="8dp" />
 
 </RelativeLayout>

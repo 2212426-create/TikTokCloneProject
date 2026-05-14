@@ -46,11 +46,15 @@ public class VideoActivity extends Activity {
         Bundle bundle = intent.getExtras();
         if (intent.hasExtra("videoId")) {
             videoId = bundle.getString("videoId");
-        }else {
-            String action = intent.getAction();
+        } else if (intent.getData() != null) {
             Uri data = intent.getData();
             List<String> segmentsList = data.getPathSegments();
             videoId = segmentsList.get(segmentsList.size() - 1);
+        }
+
+        if (videoId == null) {
+            finish();
+            return;
         }
 
         mAuth = FirebaseAuth.getInstance();
@@ -59,64 +63,48 @@ public class VideoActivity extends Activity {
         viewPager2 = findViewById(R.id.viewPager);
         videos = new ArrayList<>();
         videoAdapter = new VideoAdapter(this, videos);
-        VideoAdapter.setUser(user);
+        videoAdapter.setUser(user);
         viewPager2.setAdapter(videoAdapter);
+        
         viewPager2.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
-                super.onPageScrolled(position, positionOffset, positionOffsetPixels);
-
-            }
-
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
-                videoAdapter.playVideo(position);
-                videoAdapter.updateWatchCount(position);
-                Log.e("Selected_Page", String.valueOf(videoAdapter.getCurrentPosition()));
-                videoAdapter.updateCurrentPosition(position);
-            }
-
-            @Override
-            public void onPageScrollStateChanged(int state) {
-                super.onPageScrollStateChanged(state);
+                if (videoAdapter != null) {
+                    videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
+                    videoAdapter.updateCurrentPosition(position);
+                    videoAdapter.playVideo(position);
+                    videoAdapter.updateWatchCount(position);
+                }
             }
         });
-        viewPager2.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View view) {
 
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View view) {
-//                Log.i("position", viewPager2.getVerticalScrollbarPosition() + "");
-                videoAdapter.pauseVideo(videoAdapter.getCurrentPosition());
-
-            }
-        });
         db = FirebaseFirestore.getInstance();
         db.collection("videos").document(videoId)
-                .get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-                    @Override
-                    public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                        if (task.isSuccessful()) {
-                            DocumentSnapshot document = task.getResult();
-                            if (document.exists()) {
-                                Video video = document.toObject(Video.class);
+                .get().addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        DocumentSnapshot document = task.getResult();
+                        if (document != null && document.exists()) {
+                            Video video = document.toObject(Video.class);
+                            if (video != null) {
                                 videos.add(video);
                                 videoAdapter.notifyItemInserted(0);
-                                Log.d(TAG, "DocumentSnapshot data: " + document.getData());
-                            } else {
-                                Log.d(TAG, "No such document");
+                                // Tự động chạy video đầu tiên sau khi load xong
+                                viewPager2.post(() -> videoAdapter.playVideo(0));
                             }
                         } else {
-                            Log.d(TAG, "get failed with ", task.getException());
+                            Log.d(TAG, "No such document");
                         }
+                    } else {
+                        Log.d(TAG, "get failed with ", task.getException());
                     }
                 });
+    }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        continueVideo();
     }
 
     @Override
@@ -128,22 +116,24 @@ public class VideoActivity extends Activity {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        continueVideo();
+        // Không gọi continueVideo ở đây vì Activity đang bị hủy
     }
 
     public void pauseVideo() {
-        SharedPreferences currentPosPref = this.getSharedPreferences("position", Context.MODE_PRIVATE);
-        SharedPreferences.Editor positionEditor = currentPosPref.edit();
-        int currentPosition = videoAdapter.getCurrentPosition();
-        positionEditor.putInt("position", currentPosition);
-        videoAdapter.pauseVideo(currentPosition);
-        positionEditor.apply();
+        if (videoAdapter != null) {
+            int currentPosition = videoAdapter.getCurrentPosition();
+            SharedPreferences currentPosPref = this.getSharedPreferences("position", Context.MODE_PRIVATE);
+            SharedPreferences.Editor positionEditor = currentPosPref.edit();
+            positionEditor.putInt("position", currentPosition);
+            positionEditor.apply();
+            videoAdapter.pauseVideo(currentPosition);
+        }
     }
 
     public void continueVideo() {
-        SharedPreferences currentPosPref = this.getSharedPreferences("position", Context.MODE_PRIVATE);
-        int currentPosition = currentPosPref.getInt("position", -1);
-        if (currentPosition != -1) {
+        if (videoAdapter != null) {
+            SharedPreferences currentPosPref = this.getSharedPreferences("position", Context.MODE_PRIVATE);
+            int currentPosition = currentPosPref.getInt("position", 0);
             videoAdapter.playVideo(currentPosition);
         }
     }
@@ -151,7 +141,6 @@ public class VideoActivity extends Activity {
     public void onClick(View v) {
         if (v.getId() == R.id.btnBackVideo) {
             this.finish();
-            return;
         }
     }
 }

@@ -1,12 +1,8 @@
 package com.example.tiktokcloneproject.adapters;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.util.Log;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,17 +11,12 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-
+import com.bumptech.glide.Glide;
 import com.example.tiktokcloneproject.R;
-import com.example.tiktokcloneproject.helper.StaticVariable;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
+import com.example.tiktokcloneproject.activity.ProfileActivity;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 
@@ -67,19 +58,27 @@ public class FollowerAdapter extends BaseAdapter {
         TextView tvUserName = view.findViewById(R.id.tv_followers_userMame);
         TextView tvRemove = view.findViewById(R.id.tv_remove_follower);
 
+        String userId = followerIdList.get(i);
         tvUserName.setText(followerUserNameList.get(i));
 
-        // ĐÃ SỬA: Xóa dấu / ở đầu path "user_avatars"
-        StorageReference ref = FirebaseStorage.getInstance().getReference().child("user_avatars").child(followerIdList.get(i));
-
-        ref.getBytes(StaticVariable.MAX_BYTES_AVATAR)
-                .addOnSuccessListener(bytes -> {
-                    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    imvAvatar.setImageBitmap(bitmap);
-                })
-                .addOnFailureListener(e -> imvAvatar.setImageResource(R.drawable.default_avatar));
-
         FirebaseFirestore db = FirebaseFirestore.getInstance();
+        
+        // Tải avatarUrl từ profile thay vì Firebase Storage
+        db.collection("profiles").document(userId).get().addOnSuccessListener(doc -> {
+            if (doc.exists()) {
+                String avatarUrl = doc.getString("avatarUrl");
+                if (avatarUrl != null) {
+                    Glide.with(context)
+                            .load(avatarUrl)
+                            .placeholder(R.drawable.default_avatar)
+                            .circleCrop()
+                            .into(imvAvatar);
+                } else {
+                    imvAvatar.setImageResource(R.drawable.default_avatar);
+                }
+            }
+        });
+
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
 
         tvRemove.setOnClickListener(v -> {
@@ -88,11 +87,18 @@ public class FollowerAdapter extends BaseAdapter {
             builder.setMessage("\"" + followerUserNameList.get(i) + "\" will no longer follow you.");
             builder.setPositiveButton("Remove", (dialog, which) -> {
                 if (currentUser == null) return;
-                db.collection("profiles").document(currentUser.getUid()).collection("followers").document(followerIdList.get(i)).delete();
-                db.collection("profiles").document(followerIdList.get(i)).collection("following").document(currentUser.getUid()).delete();
+                db.collection("profiles").document(currentUser.getUid()).collection("followers").document(userId).delete();
+                db.collection("profiles").document(userId).collection("following").document(currentUser.getUid()).delete();
                 Toast.makeText(context, "Follower removed", Toast.LENGTH_SHORT).show();
             });
+            builder.setNegativeButton("Cancel", null);
             builder.show();
+        });
+
+        view.setOnClickListener(v -> {
+            Intent intent = new Intent(context, ProfileActivity.class);
+            intent.putExtra("id", userId);
+            context.startActivity(intent);
         });
 
         return view;

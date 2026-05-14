@@ -1,8 +1,7 @@
 package com.example.tiktokcloneproject.adapters;
 
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.content.Intent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,14 +9,10 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
-
+import com.bumptech.glide.Glide;
 import com.example.tiktokcloneproject.R;
-import com.example.tiktokcloneproject.helper.StaticVariable;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.firebase.storage.FirebaseStorage;
-import com.google.firebase.storage.StorageReference;
+import com.example.tiktokcloneproject.activity.ProfileActivity;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.ArrayList;
 
@@ -58,17 +53,33 @@ public class FollowingAdapter extends BaseAdapter {
         ImageView imvAvatar = view.findViewById(R.id.imv_following_avatar);
         TextView tvUserName = view.findViewById(R.id.tv_following_userMame);
         
+        String userId = followingIdList.get(i);
         tvUserName.setText(followingUserNameList.get(i));
 
-        // ĐÃ SỬA: Xóa dấu / ở đầu path "user_avatars"
-        StorageReference ref = FirebaseStorage.getInstance().getReference().child("user_avatars").child(followingIdList.get(i));
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        
+        // Tải avatarUrl từ profile thay vì Firebase Storage
+        db.collection("profiles").document(userId).get().addOnSuccessListener(doc -> {
+            if (doc.exists()) {
+                String avatarUrl = doc.getString("avatarUrl");
+                if (avatarUrl != null) {
+                    Glide.with(context)
+                            .load(avatarUrl)
+                            .placeholder(R.drawable.default_avatar)
+                            .circleCrop()
+                            .into(imvAvatar);
+                } else {
+                    imvAvatar.setImageResource(R.drawable.default_avatar);
+                }
+            }
+        });
 
-        ref.getBytes(StaticVariable.MAX_BYTES_AVATAR)
-                .addOnSuccessListener(bytes -> {
-                    Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    imvAvatar.setImageBitmap(bitmap);
-                })
-                .addOnFailureListener(e -> imvAvatar.setImageResource(R.drawable.default_avatar));
+        // Thiết lập sự kiện click để mở Profile người đó
+        view.setOnClickListener(v -> {
+            Intent intent = new Intent(context, ProfileActivity.class);
+            intent.putExtra("id", userId);
+            context.startActivity(intent);
+        });
 
         return view;
     }

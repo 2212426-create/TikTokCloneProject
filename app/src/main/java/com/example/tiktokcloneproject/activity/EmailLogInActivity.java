@@ -9,6 +9,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
@@ -21,6 +22,7 @@ import com.google.android.gms.tasks.Task;
 public class EmailLogInActivity extends AppCompatActivity {
     private EditText edtEmail, edtPassword;
     private Button btnLogin;
+    private ImageView btnBack;
     private ProgressBar progressbar;
 
     private FirebaseAuth mAuth;
@@ -37,6 +39,9 @@ public class EmailLogInActivity extends AppCompatActivity {
         edtPassword = findViewById(R.id.edtPassword);
         btnLogin = findViewById(R.id.btnLogin);
         progressbar = findViewById(R.id.progressBar);
+        btnBack = findViewById(R.id.btnBack);
+
+        btnBack.setOnClickListener(v -> finish());
 
         // Set on Click Listener on Sign-in button
         btnLogin.setOnClickListener(new View.OnClickListener() {

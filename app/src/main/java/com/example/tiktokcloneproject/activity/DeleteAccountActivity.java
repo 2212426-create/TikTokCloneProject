@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 
@@ -19,6 +20,7 @@ import com.google.firebase.auth.FirebaseUser;
 public class DeleteAccountActivity extends Activity {
 
     private Button btnDelete;
+    private ImageView btnBack;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,6 +28,9 @@ public class DeleteAccountActivity extends Activity {
         setContentView(R.layout.activity_delete_account);
 
         btnDelete = (Button) findViewById(R.id.btnDelete);
+        btnBack = findViewById(R.id.btnBack);
+
+        btnBack.setOnClickListener(v -> finish());
 
         btnDelete.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -38,7 +43,6 @@ public class DeleteAccountActivity extends Activity {
                         public void onComplete(@NonNull Task<Void> task) {
                             if (task.isSuccessful())
                             {
-                                Toast.makeText(DeleteAccountActivity.this, "test", Toast.LENGTH_SHORT).show();
                                 Toast.makeText(DeleteAccountActivity.this, "Account deleted", Toast.LENGTH_SHORT).show();
                                 Intent intent = new Intent(DeleteAccountActivity.this, HomeScreenActivity.class);
                                 startActivity(intent);

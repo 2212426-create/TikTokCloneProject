@@ -8,6 +8,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -43,6 +44,7 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
     VideoSummaryAdapter videoSummaryAdapter;
     RecyclerView rcvVideoSummary;
     TextView tvSubmitSearch;
+    ImageButton imbBackToHome;
 
     ArrayList<User> userArrayList = new ArrayList<>();
     FirebaseFirestore db;
@@ -67,6 +69,7 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
         db = FirebaseFirestore.getInstance();
 
         tvSubmitSearch = layout.findViewById(R.id.tvSubmitSearch);
+        imbBackToHome = layout.findViewById(R.id.imbBackToHome);
         searchView = layout.findViewById(R.id.searchView);
         rcv_users = layout.findViewById(R.id.rcv_users);
         rcvVideoSummary = layout.findViewById(R.id.rcvVideoSummary);
@@ -105,11 +108,12 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
 
         // Setup Video Grid
         videoSummaryAdapter = new VideoSummaryAdapter(context, videoSummaries);
-        rcvVideoSummary.setLayoutManager(new GridLayoutManager(context, 2)); // 2 cột cho đẹp
+        rcvVideoSummary.setLayoutManager(new GridLayoutManager(context, 2)); 
         rcvVideoSummary.addItemDecoration(new GridSpacingItemDecoration(2, 15, true));
         rcvVideoSummary.setAdapter(videoSummaryAdapter);
 
         if (tvSubmitSearch != null) tvSubmitSearch.setOnClickListener(this);
+        if (imbBackToHome != null) imbBackToHome.setOnClickListener(this);
 
         return layout;
     }
@@ -119,10 +123,10 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
 
         // 1. Tìm User
         searchUsers(query);
-        
+
         // 2. Tìm Video theo tiêu đề (description)
         searchVideos(query);
-        
+
         // Hiển thị cả hai hoặc ưu tiên
         rcv_users.setVisibility(View.VISIBLE);
         rcvVideoSummary.setVisibility(View.VISIBLE);
@@ -160,9 +164,13 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
                     if (task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot doc : task.getResult()) {
+                            String thumb = doc.getString("thumbnailUri");
+                            if (thumb == null || thumb.isEmpty()) {
+                                thumb = doc.getString("videoUri"); // Fallback to video URI (handled by adapter)
+                            }
                             videoSummaries.add(new VideoSummary(
                                     doc.getId(),
-                                    doc.getString("videoUri"), // Hoặc thumbnailUri nếu có
+                                    thumb,
                                     doc.getLong("watchCount")
                             ));
                         }
@@ -177,6 +185,13 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
             String query = searchView.getQuery().toString();
             performSearch(query);
             searchView.clearFocus();
+        } else if (view.getId() == R.id.imbBackToHome) {
+            if (getActivity() != null) {
+                View btnHome = getActivity().findViewById(R.id.btnHome);
+                if (btnHome != null) {
+                    btnHome.performClick();
+                }
+            }
         }
     }
 
