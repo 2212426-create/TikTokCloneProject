@@ -11,9 +11,30 @@ import { Users } from './pages/Users';
 import { Moderation } from './pages/Moderation';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { LoginPage } from './pages/LoginPage';
+import { useAuth } from './components/auth-provider';
+import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
+  const { user, loading } = useAuth();
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-4" />
+          <p className="font-label text-sm text-on-surface-variant">Đang kiểm tra đăng nhập...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not logged in → show login page
+  if (!user) {
+    return <LoginPage />;
+  }
 
   const renderContent = () => {
     switch (currentTab) {
@@ -22,11 +43,11 @@ export default function App() {
       case 'users':
         return <Users />;
       case 'moderation':
-        return <Moderation />;
+        return (user.role === 'admin' || user.role === 'moderator') ? <Moderation /> : <Dashboard />;
       case 'reports':
         return <Reports />;
       case 'settings':
-        return <Settings />;
+        return user.role === 'admin' ? <Settings /> : <Dashboard />;
       default:
         return <Dashboard />;
     }

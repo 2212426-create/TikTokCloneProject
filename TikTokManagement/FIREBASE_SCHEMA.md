@@ -18,7 +18,7 @@ Lưu trữ thông tin của tất cả người dùng (App) và nhân sự quả
   - `following`: number
   - `likes`: number
   - **Dữ liệu mở rộng cho Admin Web:**
-    - `role`: string (Enum: `"admin"`, `"moderator"`, `"user"`) - *Mặc định là "user".*
+    - `role`: string (Enum: `"admin"`, `"moderator"`, `"viewer"`, `"user"`) - *Mặc định là "user".*
     - `status`: string (Enum: `"active"`, `"banned"`, `"warned"`)
     - `createdAt`: timestamp
 

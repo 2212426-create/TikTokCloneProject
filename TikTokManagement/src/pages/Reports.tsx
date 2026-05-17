@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../components/auth-provider';
 import {
   Search,
   ChevronDown,
@@ -19,6 +20,9 @@ import { db, collection, onSnapshot, doc, updateDoc } from '../lib/firebase';
 import type { Report, ReportStatus } from '../types';
 
 export function Reports() {
+  const { user } = useAuth();
+  const adminName = user?.email || 'admin_unknown';
+  
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,7 +58,7 @@ export function Reports() {
     try {
       await updateDoc(doc(db, 'reports', reportId), {
         status: 'resolved',
-        handledBy: 'admin_web',
+        handledBy: adminName,
       });
     } catch (err) {
       console.error('Error resolving report:', err);
@@ -66,7 +70,7 @@ export function Reports() {
     try {
       await updateDoc(doc(db, 'reports', reportId), {
         status: 'dismissed',
-        handledBy: 'admin_web',
+        handledBy: adminName,
       });
     } catch (err) {
       console.error('Error dismissing report:', err);
@@ -250,7 +254,7 @@ export function Reports() {
                       )}
                     </td>
                     <td className="py-4 px-6 text-right">
-                      {report.status === 'pending' && (
+                      {report.status === 'pending' && user?.role !== 'viewer' && (
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleResolve(report.id)}

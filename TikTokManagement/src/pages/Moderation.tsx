@@ -1,17 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Filter, Play, AlertTriangle, EyeOff, Flag, Trash2, Check, RefreshCw, X } from 'lucide-react';
+import { useAuth } from '../components/auth-provider';
+import { Play, AlertTriangle, Flag, Trash2, Check, RefreshCw, X, BrainCircuit, Loader2, Sparkles, ShieldAlert } from 'lucide-react';
 import { clsx } from 'clsx';
-import { db, collection, onSnapshot, doc, updateDoc } from '../lib/firebase';
+import { db, collection, onSnapshot, doc, updateDoc, addDoc, Timestamp } from '../lib/firebase';
+import { moderateVideoContent } from '../lib/gemini';
 import type { Video } from '../types';
+import type { AIModerationResult } from '../lib/gemini';
 
 type TabFilter = 'pending' | 'approved' | 'rejected';
 
 export function Moderation() {
+  const { user } = useAuth();
+  const adminName = user?.email || 'admin_unknown';
+  
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabFilter>('pending');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [playingVideo, setPlayingVideo] = useState<Video | null>(null);
+
+  // AI states
+  const [scanningId, setScanningId] = useState<string | null>(null);
+  const [scanningAll, setScanningAll] = useState(false);
+  const [aiResults, setAiResults] = useState<Map<string, AIModerationResult>>(new Map());
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'videos'), (snapshot) => {
@@ -28,14 +40,13 @@ export function Moderation() {
           totalLikes: data.totalLikes || 0,
           totalComments: data.totalComments || 0,
           watchCount: data.watchCount || 0,
-          moderationStatus: data.moderationStatus || 'pending',
+          moderationStatus: data.moderationStatus || 'approved',
           aiFlagged: data.aiFlagged || false,
           aiConfidence: data.aiConfidence || 0,
           rejectedReason: data.rejectedReason || '',
           reviewedBy: data.reviewedBy || '',
         });
       });
-      // Sort newest first
       videosData.sort((a, b) => b.timestamp - a.timestamp);
       setVideos(videosData);
       setLoading(false);
@@ -48,7 +59,14 @@ export function Moderation() {
     try {
       await updateDoc(doc(db, 'videos', videoId), {
         moderationStatus: 'approved',
-        reviewedBy: 'admin_web',
+        reviewedBy: adminName,
+      });
+      await addDoc(collection(db, 'audit_logs'), {
+        adminId: adminName,
+        action: 'APPROVE_VIDEO',
+        targetId: videoId,
+        details: {},
+        createdAt: Timestamp.now(),
       });
     } catch (err) {
       console.error('Error approving video:', err);
@@ -56,12 +74,20 @@ export function Moderation() {
     }
   };
 
-  const handleReject = async (videoId: string) => {
+  const handleReject = async (videoId: string, reason?: string) => {
     try {
+      const finalReason = reason || rejectReason || 'Vi phạm tiêu chuẩn cộng đồng';
       await updateDoc(doc(db, 'videos', videoId), {
         moderationStatus: 'rejected',
-        rejectedReason: rejectReason || 'Vi phạm tiêu chuẩn cộng đồng',
-        reviewedBy: 'admin_web',
+        rejectedReason: finalReason,
+        reviewedBy: adminName,
+      });
+      await addDoc(collection(db, 'audit_logs'), {
+        adminId: adminName,
+        action: 'REJECT_VIDEO',
+        targetId: videoId,
+        details: { reason: finalReason },
+        createdAt: Timestamp.now(),
       });
       setRejectingId(null);
       setRejectReason('');
@@ -69,6 +95,47 @@ export function Moderation() {
       console.error('Error rejecting video:', err);
       alert('Lỗi khi từ chối video!');
     }
+  };
+
+  // --- AI Moderation ---
+  const handleAIScan = async (video: Video) => {
+    setScanningId(video.videoId);
+    try {
+      const result = await moderateVideoContent(video.description, video.username);
+      setAiResults((prev) => new Map(prev).set(video.videoId, result));
+
+      // Update Firestore with AI result
+      await updateDoc(doc(db, 'videos', video.videoId), {
+        aiFlagged: result.isViolation,
+        aiConfidence: result.confidence,
+      });
+    } catch (err) {
+      console.error('AI scan error:', err);
+    } finally {
+      setScanningId(null);
+    }
+  };
+
+  const handleAIScanAll = async () => {
+    const pendingVideos = videos.filter((v) => v.moderationStatus === 'pending');
+    if (pendingVideos.length === 0) return;
+
+    setScanningAll(true);
+    for (const video of pendingVideos) {
+      try {
+        const result = await moderateVideoContent(video.description, video.username);
+        setAiResults((prev) => new Map(prev).set(video.videoId, result));
+        await updateDoc(doc(db, 'videos', video.videoId), {
+          aiFlagged: result.isViolation,
+          aiConfidence: result.confidence,
+        });
+        // Delay to avoid rate limiting
+        await new Promise((r) => setTimeout(r, 800));
+      } catch (err) {
+        console.error('AI scan error for', video.videoId, err);
+      }
+    }
+    setScanningAll(false);
   };
 
   const filteredVideos = videos.filter((v) => v.moderationStatus === activeTab);
@@ -94,32 +161,50 @@ export function Moderation() {
         <div>
           <h2 className="font-headline text-3xl font-bold text-on-surface mb-2">Kiểm duyệt Video</h2>
           <p className="font-body text-base text-on-surface-variant max-w-2xl">
-            Quản lý và duyệt các video được tải lên từ App. Dữ liệu đồng bộ real-time với Firestore.
+            Quản lý và duyệt video. Tích hợp <strong className="text-primary">Gemini AI</strong> kiểm duyệt tự động.
           </p>
         </div>
-        <div className="flex bg-surface-low rounded-lg p-1 border border-outline-variant/20 inline-flex">
-          <button 
-            onClick={() => setActiveTab('pending')}
-            className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'pending' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
-          >
-            Chờ duyệt ({pendingCount})
-          </button>
-          <button 
-            onClick={() => setActiveTab('approved')}
-            className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'approved' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
-          >
-            Đã duyệt ({approvedCount})
-          </button>
-          <button 
-            onClick={() => setActiveTab('rejected')}
-            className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'rejected' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
-          >
-            Đã gỡ bỏ ({rejectedCount})
-          </button>
+        <div className="flex items-center gap-3">
+          {/* AI Scan All Button */}
+          {activeTab === 'pending' && pendingCount > 0 && (
+            <button
+              onClick={handleAIScanAll}
+              disabled={scanningAll}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/90 to-secondary/90 text-on-primary rounded-lg font-label text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-xl transition-all disabled:opacity-50"
+            >
+              {scanningAll ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <BrainCircuit className="w-4 h-4" />
+              )}
+              {scanningAll ? `Đang quét...` : `AI Quét tất cả (${pendingCount})`}
+            </button>
+          )}
+
+          <div className="flex bg-surface-low rounded-lg p-1 border border-outline-variant/20 inline-flex">
+            <button 
+              onClick={() => setActiveTab('pending')}
+              className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'pending' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
+            >
+              Chờ duyệt ({pendingCount})
+            </button>
+            <button 
+              onClick={() => setActiveTab('approved')}
+              className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'approved' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
+            >
+              Đã duyệt ({approvedCount})
+            </button>
+            <button 
+              onClick={() => setActiveTab('rejected')}
+              className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'rejected' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
+            >
+              Đã gỡ bỏ ({rejectedCount})
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Loading State */}
+      {/* Loading / Empty */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <RefreshCw className="w-8 h-8 animate-spin text-primary" />
@@ -135,152 +220,319 @@ export function Moderation() {
           </p>
         </div>
       ) : (
-        /* Grid of Videos */
+        /* Video Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredVideos.map((video) => (
-            <div key={video.videoId} className={clsx(
-              "glass-panel glass-panel-hover rounded-xl overflow-hidden flex flex-col transition-all duration-300",
-              video.aiFlagged && "border-error/30"
-            )}>
-              {/* Thumbnail / Video Preview */}
-              <div className="relative w-full aspect-[9/16] bg-surface-highest group cursor-pointer overflow-hidden">
-                {video.videoUri ? (
-                  <video 
-                    src={video.videoUri} 
-                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-300"
-                    muted
-                    preload="metadata"
-                    onMouseEnter={(e) => (e.target as HTMLVideoElement).play()}
-                    onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-surface-high">
-                    <Play className="w-12 h-12 text-on-surface-variant/30" />
-                  </div>
-                )}
-                
-                {/* Play Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-background/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-12 h-12 rounded-full bg-background/60 backdrop-blur flex items-center justify-center border border-on-surface/20">
-                    <Play className="w-6 h-6 text-on-surface fill-current" />
-                  </div>
-                </div>
+          {filteredVideos.map((video) => {
+            const aiResult = aiResults.get(video.videoId);
+            const isScanning = scanningId === video.videoId;
 
-                {/* Badges */}
-                <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                  {video.aiFlagged ? (
-                    <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-error-container/90 text-on-error-container border-error/20">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      AI: {video.aiConfidence}%
-                    </div>
+            return (
+              <div key={video.videoId} className={clsx(
+                "glass-panel glass-panel-hover rounded-xl overflow-hidden flex flex-col transition-all duration-300",
+                (video.aiFlagged || aiResult?.isViolation) && "border-error/30"
+              )}>
+                {/* Thumbnail / Video Preview */}
+                <div 
+                  className="relative w-full aspect-[9/16] bg-surface-highest group cursor-pointer overflow-hidden"
+                  onClick={() => setPlayingVideo(video)}
+                >
+                  {video.videoUri ? (
+                    <video 
+                      src={video.videoUri} 
+                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-300"
+                      muted
+                      preload="metadata"
+                      onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+                      onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
+                    />
                   ) : (
-                    <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-surface-variant/90 text-on-surface-variant border-outline/20">
-                      <Flag className="w-3.5 h-3.5" />
-                      Chờ duyệt
+                    <div className="w-full h-full flex items-center justify-center bg-surface-high">
+                      <Play className="w-12 h-12 text-on-surface-variant/30" />
                     </div>
                   )}
-                  <div className="bg-surface/80 backdrop-blur text-on-surface px-2 py-0.5 rounded font-label text-[10px]">
-                    ❤ {video.totalLikes} · 👁 {video.watchCount}
-                  </div>
-                </div>
-
-                {/* Rejection badge */}
-                {video.moderationStatus === 'rejected' && (
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <div className="bg-error/90 backdrop-blur text-on-error px-3 py-1.5 rounded font-label text-xs">
-                      Lý do: {video.rejectedReason || 'Không rõ'}
+                  
+                  {/* Play Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 rounded-full bg-background/60 backdrop-blur flex items-center justify-center border border-on-surface/20">
+                      <Play className="w-6 h-6 text-on-surface fill-current" />
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Content */}
-              <div className="p-4 flex-1 flex flex-col bg-surface-low/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                    {video.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-label text-sm text-on-surface truncate">@{video.username}</p>
-                    <p className="text-[10px] text-on-surface-variant truncate">{formatTimeAgo(video.timestamp)}</p>
-                  </div>
-                </div>
-                <p className="font-body text-sm text-on-surface-variant line-clamp-2 mb-4 flex-1">
-                  {video.description || 'Không có mô tả'}
-                </p>
-
-                {/* Actions */}
-                {activeTab === 'pending' && (
-                  <div className="grid grid-cols-2 gap-2 mt-auto">
-                    {rejectingId === video.videoId ? (
-                      <div className="col-span-2 space-y-2">
-                        <input 
-                          type="text"
-                          placeholder="Lý do từ chối..."
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          className="w-full bg-surface border border-outline-variant/20 text-on-surface font-label text-sm p-2 rounded outline-none focus:border-error"
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <button 
-                            onClick={() => handleReject(video.videoId)}
-                            className="py-2 rounded bg-error text-on-error hover:bg-error/90 font-label text-sm font-bold transition-colors"
-                          >
-                            Xác nhận gỡ
-                          </button>
-                          <button 
-                            onClick={() => { setRejectingId(null); setRejectReason(''); }}
-                            className="py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-high font-label text-sm transition-colors"
-                          >
-                            Hủy
-                          </button>
-                        </div>
+                  {/* Badges */}
+                  <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+                    {video.aiFlagged || aiResult?.isViolation ? (
+                      <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-error-container/90 text-on-error-container border-error/20">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        AI: {aiResult?.confidence || video.aiConfidence}%
+                      </div>
+                    ) : aiResult && !aiResult.isViolation ? (
+                      <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-secondary-container/20 text-secondary-container border-secondary-container/20">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        AI: An toàn
                       </div>
                     ) : (
-                      <>
+                      <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-surface-variant/90 text-on-surface-variant border-outline/20">
+                        <Flag className="w-3.5 h-3.5" />
+                        {activeTab === 'approved' ? 'Đã duyệt' : activeTab === 'rejected' ? 'Đã gỡ' : 'Chờ duyệt'}
+                      </div>
+                    )}
+                    <div className="bg-surface/80 backdrop-blur text-on-surface px-2 py-0.5 rounded font-label text-[10px]">
+                      ❤ {video.totalLikes} · 👁 {video.watchCount}
+                    </div>
+                  </div>
+
+                  {/* Rejection badge */}
+                  {video.moderationStatus === 'rejected' && (
+                    <div className="absolute bottom-3 left-3 right-3">
+                      <div className="bg-error/90 backdrop-blur text-on-error px-3 py-1.5 rounded font-label text-xs">
+                        Lý do: {video.rejectedReason || 'Không rõ'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="p-4 flex-1 flex flex-col bg-surface-low/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                      {video.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-label text-sm text-on-surface truncate">@{video.username}</p>
+                      <p className="text-[10px] text-on-surface-variant truncate">{formatTimeAgo(video.timestamp)}</p>
+                    </div>
+                  </div>
+                  <p className="font-body text-sm text-on-surface-variant line-clamp-2 mb-3 flex-1">
+                    {video.description || 'Không có mô tả'}
+                  </p>
+
+                  {/* AI Result Card */}
+                  {aiResult && (
+                    <div className={clsx(
+                      "p-3 rounded-lg mb-3 border text-xs font-label",
+                      aiResult.isViolation 
+                        ? "bg-error/10 border-error/20 text-error" 
+                        : "bg-secondary-container/10 border-secondary-container/20 text-secondary-container"
+                    )}>
+                      <div className="flex items-center gap-1.5 mb-1 font-medium">
+                        {aiResult.isViolation ? <ShieldAlert className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {aiResult.isViolation ? `Vi phạm: ${aiResult.category}` : 'Nội dung an toàn'}
+                        <span className="ml-auto opacity-70">{aiResult.confidence}%</span>
+                      </div>
+                      <p className="line-clamp-2 opacity-80">{aiResult.reason}</p>
+                    </div>
+                  )}
+
+                  {/* Actions for PENDING */}
+                  {activeTab === 'pending' && (
+                    <div className="space-y-2 mt-auto">
+                      {/* AI Scan button */}
+                      <button
+                        onClick={() => handleAIScan(video)}
+                        disabled={isScanning || scanningAll}
+                        className="w-full py-2 rounded border border-primary/30 text-primary hover:bg-primary/10 font-label text-sm flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        {isScanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+                        {isScanning ? 'Đang phân tích...' : 'AI Kiểm duyệt'}
+                      </button>
+
+                      {rejectingId === video.videoId ? (
+                        <div className="space-y-2">
+                          <input 
+                            type="text"
+                            placeholder="Lý do từ chối..."
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            className="w-full bg-surface border border-outline-variant/20 text-on-surface font-label text-sm p-2 rounded outline-none focus:border-error"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <button 
+                              onClick={() => handleReject(video.videoId)}
+                              className="py-2 rounded bg-error text-on-error hover:bg-error/90 font-label text-sm font-bold transition-colors"
+                            >
+                              Xác nhận gỡ
+                            </button>
+                            <button 
+                              onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                              className="py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-high font-label text-sm transition-colors"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button 
+                            onClick={() => setRejectingId(video.videoId)}
+                            className="py-2 rounded border border-error text-error hover:bg-error/10 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" /> Gỡ bỏ
+                          </button>
+                          <button 
+                            onClick={() => handleApprove(video.videoId)}
+                            className="py-2 rounded bg-secondary-container/20 text-secondary-container border border-secondary-container/30 hover:bg-secondary-container/30 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <Check className="w-4 h-4" /> Duyệt
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions for APPROVED - can now REJECT */}
+                  {activeTab === 'approved' && (
+                    <div className="mt-auto space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/10 text-secondary-container font-label text-xs border border-secondary-container/20">
+                          <Check className="w-3.5 h-3.5" />
+                          Đã duyệt
+                        </span>
+                      </div>
+                      {rejectingId === video.videoId ? (
+                        <div className="space-y-2">
+                          <input 
+                            type="text"
+                            placeholder="Lý do gỡ bỏ..."
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            className="w-full bg-surface border border-outline-variant/20 text-on-surface font-label text-sm p-2 rounded outline-none focus:border-error"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <button 
+                              onClick={() => handleReject(video.videoId)}
+                              className="py-2 rounded bg-error text-on-error hover:bg-error/90 font-label text-sm font-bold transition-colors"
+                            >
+                              Xác nhận gỡ
+                            </button>
+                            <button 
+                              onClick={() => { setRejectingId(null); setRejectReason(''); }}
+                              className="py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-high font-label text-sm transition-colors"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                         <button 
                           onClick={() => setRejectingId(video.videoId)}
-                          className="py-2 rounded border border-error text-error hover:bg-error/10 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
+                          className="w-full py-2 rounded border border-error/50 text-error hover:bg-error/10 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
                         >
-                          <Trash2 className="w-4 h-4" /> Gỡ bỏ
+                          <Trash2 className="w-4 h-4" /> Gỡ bỏ video
                         </button>
-                        <button 
-                          onClick={() => handleApprove(video.videoId)}
-                          className="py-2 rounded bg-secondary-container/20 text-secondary-container border border-secondary-container/30 hover:bg-secondary-container/30 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
-                        >
-                          <Check className="w-4 h-4" /> Duyệt
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  )}
 
-                {activeTab === 'approved' && (
-                  <div className="mt-auto">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/10 text-secondary-container font-label text-xs border border-secondary-container/20">
-                      <Check className="w-3.5 h-3.5" />
-                      Đã được duyệt
-                    </span>
-                  </div>
-                )}
-
-                {activeTab === 'rejected' && (
-                  <div className="mt-auto flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error/10 text-error font-label text-xs border border-error/20">
-                      <X className="w-3.5 h-3.5" />
-                      Đã gỡ bỏ
-                    </span>
-                    <button 
-                      onClick={() => handleApprove(video.videoId)}
-                      className="text-xs font-label text-primary hover:underline"
-                    >
-                      Khôi phục
-                    </button>
-                  </div>
-                )}
+                  {/* Actions for REJECTED - can restore */}
+                  {activeTab === 'rejected' && (
+                    <div className="mt-auto flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error/10 text-error font-label text-xs border border-error/20">
+                        <X className="w-3.5 h-3.5" />
+                        Đã gỡ bỏ
+                      </span>
+                      <button 
+                        onClick={() => handleApprove(video.videoId)}
+                        className="text-xs font-label text-primary hover:underline"
+                      >
+                        Khôi phục
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+      {/* Playing Video Modal */}
+      {playingVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/90 backdrop-blur-md">
+          <div className="relative w-full max-w-4xl max-h-screen flex flex-col md:flex-row bg-surface border border-outline-variant/20 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Video Player */}
+            <div className="relative flex-1 bg-black flex items-center justify-center min-h-[50vh] md:min-h-[80vh]">
+              {playingVideo.videoUri ? (
+                <video 
+                  src={playingVideo.videoUri} 
+                  controls 
+                  autoPlay 
+                  className="max-w-full max-h-[80vh] w-auto h-auto object-contain"
+                />
+              ) : (
+                <div className="text-on-surface-variant flex flex-col items-center">
+                  <Play className="w-16 h-16 mb-4 opacity-50" />
+                  <p>Video không khả dụng</p>
+                </div>
+              )}
             </div>
-          ))}
+            
+            {/* Video Details Side Panel */}
+            <div className="w-full md:w-80 flex flex-col bg-surface-low border-l border-outline-variant/10">
+              <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-surface">
+                <h3 className="font-headline font-bold text-on-surface truncate">Chi tiết Video</h3>
+                <button 
+                  onClick={() => setPlayingVideo(null)}
+                  className="p-1.5 text-on-surface-variant hover:bg-surface-high hover:text-on-surface rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-4 flex-1 overflow-y-auto space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                    {playingVideo.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-label text-sm text-on-surface font-bold">@{playingVideo.username}</p>
+                    <p className="text-xs text-on-surface-variant">{new Date(playingVideo.timestamp).toLocaleString('vi-VN')}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-surface-high/50 p-3 rounded-lg border border-outline-variant/10">
+                  <p className="font-body text-sm text-on-surface whitespace-pre-wrap">{playingVideo.description || 'Không có mô tả'}</p>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 text-center py-2">
+                  <div className="bg-surface p-2 rounded border border-outline-variant/10">
+                    <p className="text-xs text-on-surface-variant mb-1">Lượt thích</p>
+                    <p className="font-label font-bold text-on-surface">{playingVideo.totalLikes}</p>
+                  </div>
+                  <div className="bg-surface p-2 rounded border border-outline-variant/10">
+                    <p className="text-xs text-on-surface-variant mb-1">Bình luận</p>
+                    <p className="font-label font-bold text-on-surface">{playingVideo.totalComments}</p>
+                  </div>
+                  <div className="bg-surface p-2 rounded border border-outline-variant/10">
+                    <p className="text-xs text-on-surface-variant mb-1">Lượt xem</p>
+                    <p className="font-label font-bold text-on-surface">{playingVideo.watchCount}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Quick Actions in Player */}
+              {user?.role !== 'viewer' && activeTab === 'pending' && (
+                <div className="p-4 border-t border-outline-variant/10 flex gap-2 bg-surface">
+                  <button
+                    onClick={() => {
+                      handleApprove(playingVideo.videoId);
+                      setPlayingVideo(null);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-secondary-container/20 text-secondary-container hover:bg-secondary-container hover:text-on-secondary-container font-label text-sm rounded-lg transition-colors border border-secondary-container/30"
+                  >
+                    <Check className="w-4 h-4" /> Duyệt
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRejectingId(playingVideo.videoId);
+                      setPlayingVideo(null);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-error/10 text-error hover:bg-error hover:text-on-error font-label text-sm rounded-lg transition-colors border border-error/20"
+                  >
+                    <Trash2 className="w-4 h-4" /> Gỡ
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

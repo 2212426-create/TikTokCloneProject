@@ -41,8 +41,8 @@ public class ActiveUserAdapter extends RecyclerView.Adapter<ActiveUserAdapter.Vi
         User user = mUsers.get(position);
         holder.username.setText(user.getUsername());
         
-        if (user.getAvatarUri() != null && !user.getAvatarUri().isEmpty()) {
-            Glide.with(mContext).load(user.getAvatarUri()).into(holder.profile_image);
+        if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
+            Glide.with(mContext).load(user.getAvatarUrl()).into(holder.profile_image);
         } else {
             holder.profile_image.setImageResource(R.drawable.default_avatar);
         }

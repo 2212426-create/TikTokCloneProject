@@ -283,6 +283,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         videoData.put("totalComments", 0);
         videoData.put("watchCount", 0);
         videoData.put("timestamp", System.currentTimeMillis());
+        videoData.put("moderationStatus", "pending"); // Chờ duyệt mặc định
 
         db.collection("videos").document(Id).set(videoData);
 

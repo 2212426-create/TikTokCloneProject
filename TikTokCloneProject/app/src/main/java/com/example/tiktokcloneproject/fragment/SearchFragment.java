@@ -164,6 +164,11 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
                     if (task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot doc : task.getResult()) {
+                            String modStatus = doc.getString("moderationStatus");
+                            if ("rejected".equals(modStatus) || "pending".equals(modStatus)) {
+                                continue;
+                            }
+                            
                             String thumb = doc.getString("thumbnailUri");
                             if (thumb == null || thumb.isEmpty()) {
                                 thumb = doc.getString("videoUri"); // Fallback to video URI (handled by adapter)

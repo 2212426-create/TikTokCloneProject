@@ -158,6 +158,8 @@ public class EmailSignInActivity extends AppCompatActivity {
                 userData.put("email", finalEmail == null ? "" : finalEmail);
                 userData.put("isPrivate", false);
                 userData.put("phone", "");
+                userData.put("status", "active");
+                userData.put("role", "user");
 
                 db.collection("users").document(uid).set(userData)
                         .addOnCompleteListener(createUserTask -> {
@@ -171,6 +173,14 @@ public class EmailSignInActivity extends AppCompatActivity {
                             checkAndCreateProfile(uid, finalUsername, finalEmail, account);
                         });
             } else {
+                String status = userTask.getResult().getString("status");
+                if ("banned".equals(status)) {
+                    if (dialog != null) dialog.dismiss();
+                    FirebaseAuth.getInstance().signOut();
+                    Toast.makeText(this, "Tài khoản của bạn đã bị khóa do vi phạm tiêu chuẩn cộng đồng.", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
                 checkAndCreateProfile(uid, finalUsername, finalEmail, account);
             }
         });

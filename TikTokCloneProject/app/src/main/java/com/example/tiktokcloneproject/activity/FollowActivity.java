@@ -30,7 +30,6 @@ public class FollowActivity extends Activity {
     private TextView txvFollowing, txvFollowers, txvLikes, txvUserName;
     private Button btn, btnMessage;
     private ImageView imvAvatarProfile, btnBack;
-    Uri avatarUri;
     FirebaseFirestore db;
     FirebaseAuth mAuth;
     FirebaseUser currentUser;

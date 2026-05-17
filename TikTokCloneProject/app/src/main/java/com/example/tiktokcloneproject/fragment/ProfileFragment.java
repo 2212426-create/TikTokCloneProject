@@ -229,6 +229,14 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                     if (isAdded() && task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot document : task.getResult()) {
+                            String modStatus = document.getString("moderationStatus");
+                            if ("rejected".equals(modStatus)) {
+                                continue;
+                            }
+                            if ("pending".equals(modStatus) && (currentUserID == null || !currentUserID.equals(userId))) {
+                                continue;
+                            }
+                            
                             String thumb = document.getString("videoUri");
                             if (thumb == null || thumb.isEmpty()) {
                                 thumb = document.getString("thumbnailUri");

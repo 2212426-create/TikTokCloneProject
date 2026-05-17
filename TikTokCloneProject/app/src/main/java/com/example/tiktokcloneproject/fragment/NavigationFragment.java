@@ -34,7 +34,7 @@ public class NavigationFragment extends Fragment implements View.OnClickListener
     private FirebaseFirestore db;
     private static long pressedBackTime = 0;
     private final static String TAG = "NavigationFragment";
-    private String avatarUri;
+
 
 
     public static NavigationFragment newInstance(String strArg) {

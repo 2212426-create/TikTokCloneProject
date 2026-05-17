@@ -101,13 +101,37 @@ public class VideoHomeScreenActivity extends Activity implements View.OnClickLis
                     if (snapshots != null) {
                         for (DocumentChange dc : snapshots.getDocumentChanges()) {
                             Video video = dc.getDocument().toObject(Video.class);
+                            
+                            // Bỏ qua video bị gỡ HOẶC đang chờ duyệt
+                            if ("rejected".equals(video.getModerationStatus()) || "pending".equals(video.getModerationStatus())) {
+                                if (dc.getType() == DocumentChange.Type.MODIFIED || dc.getType() == DocumentChange.Type.REMOVED) {
+                                    int oldIndex = dc.getOldIndex();
+                                    if (oldIndex < videos.size() && oldIndex != -1) {
+                                        int index = -1;
+                                        for(int i=0; i<videos.size(); i++) {
+                                            if (videos.get(i).getVideoId().equals(video.getVideoId())) { index = i; break; }
+                                        }
+                                        if (index != -1) {
+                                            videos.remove(index);
+                                            videoAdapter.notifyItemRemoved(index);
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+                            
                             int newIndex = dc.getNewIndex();
                             int oldIndex = dc.getOldIndex();
 
                             switch (dc.getType()) {
                                 case ADDED:
-                                    videos.add(newIndex, video);
-                                    videoAdapter.notifyItemInserted(newIndex);
+                                    if (newIndex <= videos.size()) {
+                                        videos.add(newIndex, video);
+                                        videoAdapter.notifyItemInserted(newIndex);
+                                    } else {
+                                        videos.add(video);
+                                        videoAdapter.notifyItemInserted(videos.size() - 1);
+                                    }
                                     break;
                                 case MODIFIED:
                                     if (oldIndex == newIndex) {

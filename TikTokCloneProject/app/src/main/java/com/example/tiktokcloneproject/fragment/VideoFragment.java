@@ -119,6 +119,27 @@ public class VideoFragment extends Fragment {
                         
                         for (DocumentChange dc : snapshots.getDocumentChanges()) {
                             Video video = dc.getDocument().toObject(Video.class);
+                            
+                            // Bỏ qua video bị gỡ HOẶC đang chờ duyệt
+                            if ("rejected".equals(video.getModerationStatus()) || "pending".equals(video.getModerationStatus())) {
+                                if (dc.getType() == DocumentChange.Type.MODIFIED || dc.getType() == DocumentChange.Type.REMOVED) {
+                                    // Xóa video này khỏi danh sách nếu nó vừa bị gỡ
+                                    int oldIndex = dc.getOldIndex();
+                                    if (oldIndex < videos.size() && oldIndex != -1) {
+                                        // Tìm chính xác vị trí trong list nội bộ vì index có thể khác
+                                        int index = -1;
+                                        for(int i=0; i<videos.size(); i++) {
+                                            if (videos.get(i).getVideoId().equals(video.getVideoId())) { index = i; break; }
+                                        }
+                                        if (index != -1) {
+                                            videos.remove(index);
+                                            videoAdapter.notifyItemRemoved(index);
+                                        }
+                                    }
+                                }
+                                continue;
+                            }
+                            
                             int newIndex = dc.getNewIndex();
                             int oldIndex = dc.getOldIndex();
 
@@ -128,6 +149,9 @@ public class VideoFragment extends Fragment {
                                     if (newIndex <= videos.size()) {
                                         videos.add(newIndex, video);
                                         videoAdapter.notifyItemInserted(newIndex);
+                                    } else {
+                                        videos.add(video);
+                                        videoAdapter.notifyItemInserted(videos.size() - 1);
                                     }
                                     break;
                                 case MODIFIED:

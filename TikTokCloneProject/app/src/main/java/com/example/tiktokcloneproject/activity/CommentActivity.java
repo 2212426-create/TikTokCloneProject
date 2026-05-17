@@ -58,8 +58,7 @@ public class CommentActivity extends Activity implements View.OnClickListener{
     private LinearLayout llComment;
     private EditText edtComment;
     private ImageButton imbSendComment;
-    private String videoId, userId, avatarName;
-    private Uri avatarUri;
+    private String videoId, userId;
     private Bitmap bitmap;
     private ListView lvComment;
     FirebaseAuth mAuth;
