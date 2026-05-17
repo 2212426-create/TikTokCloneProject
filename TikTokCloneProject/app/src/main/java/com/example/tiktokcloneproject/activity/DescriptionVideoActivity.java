@@ -9,7 +9,6 @@ import androidx.fragment.app.FragmentActivity;
 import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -20,19 +19,22 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.webkit.MimeTypeMap;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.cloudinary.android.MediaManager;
 import com.cloudinary.android.callback.ErrorInfo;
 import com.cloudinary.android.callback.UploadCallback;
 import com.example.tiktokcloneproject.R;
-import com.example.tiktokcloneproject.helper.Validator;
-import com.example.tiktokcloneproject.model.Video;
-import com.example.tiktokcloneproject.model.VideoSummary;
+import com.example.tiktokcloneproject.helper.GeminiHelper;
+import com.google.ai.client.generativeai.type.GenerateContentResponse;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -45,19 +47,20 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class DescriptionVideoActivity extends FragmentActivity implements View.OnClickListener {
     EditText edtDescription;
-    Button btnDescription;
+    Button btnDescription, btnAddHashtag;
     ImageView imvShortCutVideo, btnBack;
-    final String REGEX_HASHTAG = "#([A-Za-z0-9_-]+)";
+    ImageButton btnAiSuggest;
+    ProgressBar pbAiLoading;
 
+    final String REGEX_HASHTAG = "#([A-Za-z0-9_-]+)";
     String username = "user";
     Uri videoUri;
-    
-    // TĂNG GIỚI HẠN LÊN 5 PHÚT (5 * 60 * 1000)
     final long maximumDuration = 300000;
 
     FirebaseAuth mAuth;
@@ -72,7 +75,6 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
     NotificationManagerCompat mNotifyManager;
     NotificationCompat.Builder mBuilder;
     private static final int NOTIFICATION_ID = 4004;
-
     private static final String UPLOAD_PRESET = "toptopclone";
 
     @Override
@@ -84,6 +86,9 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         btnDescription = findViewById(R.id.btnDescription);
         imvShortCutVideo = findViewById(R.id.imvShortCutVideo);
         btnBack = findViewById(R.id.btnBack);
+        btnAiSuggest = findViewById(R.id.btnAiSuggest);
+        pbAiLoading = findViewById(R.id.pbAiLoading);
+        btnAddHashtag = findViewById(R.id.btnAddHashtag);
 
         mAuth = FirebaseAuth.getInstance();
         user = mAuth.getCurrentUser();
@@ -103,16 +108,16 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         
         mNotifyManager = NotificationManagerCompat.from(getApplicationContext());
         mBuilder = new NotificationCompat.Builder(getApplicationContext(), "Video_Upload_Channel")
-                .setContentTitle("Video status")
-                .setContentText("Preparing to upload...")
+                .setContentTitle("Trạng thái tải lên")
+                .setContentText("Đang chuẩn bị...")
                 .setSmallIcon(R.drawable.ic_download)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setOngoing(true);
 
         btnDescription.setOnClickListener(this);
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> finish());
-        }
+        btnAiSuggest.setOnClickListener(this);
+        if (btnAddHashtag != null) btnAddHashtag.setOnClickListener(this);
+        if (btnBack != null) btnBack.setOnClickListener(v -> finish());
     }
 
     private void safeNotify() {
@@ -135,21 +140,21 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
             MediaMetadataRetriever mmr = new MediaMetadataRetriever();
             try {
                 mmr.setDataSource(this, videoUri);
-                
-                // Kiểm tra thời lượng video
                 String durationStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
                 long duration = Long.parseLong(durationStr);
                 
                 if (duration > maximumDuration) {
                     runOnUiThread(() -> {
-                        Toast.makeText(this, "Video too long! Maximum is 5 minutes.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "Video quá dài! Tối đa 5 phút.", Toast.LENGTH_LONG).show();
                         btnDescription.setEnabled(false);
                     });
                 }
 
                 thumbnail = mmr.getFrameAtTime(1000000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC);
                 runOnUiThread(() -> {
-                    if (thumbnail != null && !isFinishing()) imvShortCutVideo.setImageBitmap(thumbnail);
+                    if (thumbnail != null && !isFinishing()) {
+                        imvShortCutVideo.setImageBitmap(thumbnail);
+                    }
                 });
             } catch (Exception e) {
                 Log.e(TAG, "Metadata error: " + e.getMessage());
@@ -169,29 +174,96 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
 
     @Override
     public void onClick(View view) {
-        if (view.getId() == R.id.btnDescription) {
-            if (user == null) {
-                Toast.makeText(this, "Please login first", Toast.LENGTH_SHORT).show();
-                return;
+        int viewId = view.getId();
+        if (viewId == R.id.btnDescription) {
+            handlePostVideo();
+        } else if (viewId == R.id.btnAiSuggest) {
+            handleAiSuggestion();
+        } else if (viewId == R.id.btnAddHashtag) {
+            insertHashtagSymbol();
+        }
+    }
+
+    private void insertHashtagSymbol() {
+        String currentText = edtDescription.getText().toString();
+        int cursorPosition = edtDescription.getSelectionStart();
+        String hashtag = "#";
+        
+        // Thêm dấu cách trước # nếu chưa có và không phải ở đầu dòng
+        if (cursorPosition > 0 && currentText.charAt(cursorPosition - 1) != ' ') {
+            hashtag = " #";
+        }
+        
+        edtDescription.getText().insert(cursorPosition, hashtag);
+        edtDescription.requestFocus();
+    }
+
+    private void handleAiSuggestion() {
+        if (thumbnail == null) {
+            Toast.makeText(this, "Vui lòng đợi video tải xong", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        runOnUiThread(() -> {
+            btnAiSuggest.setVisibility(View.GONE);
+            pbAiLoading.setVisibility(View.VISIBLE);
+            Toast.makeText(this, "AI đang tìm hashtag viral...", Toast.LENGTH_SHORT).show();
+        });
+
+        ListenableFuture<GenerateContentResponse> future = GeminiHelper.suggestHashtags(thumbnail);
+        
+        Futures.addCallback(future, new FutureCallback<GenerateContentResponse>() {
+            @Override
+            public void onSuccess(GenerateContentResponse result) {
+                runOnUiThread(() -> {
+                    String suggestion = result.getText();
+                    if (suggestion != null) {
+                        String currentText = edtDescription.getText().toString();
+                        if (!currentText.isEmpty() && !currentText.endsWith(" ")) {
+                            currentText += " ";
+                        }
+                        edtDescription.setText(currentText + suggestion);
+                        edtDescription.setSelection(edtDescription.getText().length());
+                    }
+                    pbAiLoading.setVisibility(View.GONE);
+                    btnAiSuggest.setVisibility(View.VISIBLE);
+                });
             }
 
-            final String description = edtDescription.getText().toString().trim();
-            hashtags.clear();
-            Matcher matcher = Pattern.compile(REGEX_HASHTAG).matcher(description);
-            while (matcher.find()) hashtags.add(matcher.group(0));
-            
-            Id = String.valueOf(System.currentTimeMillis());
-            btnDescription.setEnabled(false);
-            
-            db.collection("profiles").document(user.getUid()).get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        String u = task.getResult().getString("username");
-                        if (u != null) username = u;
-                    }
-                    startCloudinaryUpload(description);
+            @Override
+            public void onFailure(Throwable t) {
+                runOnUiThread(() -> {
+                    Log.e(TAG, "AI Error: " + t.getMessage());
+                    pbAiLoading.setVisibility(View.GONE);
+                    btnAiSuggest.setVisibility(View.VISIBLE);
+                    Toast.makeText(DescriptionVideoActivity.this, "Không thể lấy gợi ý từ AI", Toast.LENGTH_SHORT).show();
                 });
+            }
+        }, Executors.newSingleThreadExecutor());
+    }
+
+    private void handlePostVideo() {
+        if (user == null) {
+            Toast.makeText(this, "Vui lòng đăng nhập trước", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        final String description = edtDescription.getText().toString().trim();
+        hashtags.clear();
+        Matcher matcher = Pattern.compile(REGEX_HASHTAG).matcher(description);
+        while (matcher.find()) hashtags.add(matcher.group(1).toLowerCase());
+        
+        Id = String.valueOf(System.currentTimeMillis());
+        btnDescription.setEnabled(false);
+        
+        db.collection("profiles").document(user.getUid()).get()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    String u = task.getResult().getString("username");
+                    if (u != null) username = u;
+                }
+                startCloudinaryUpload(description);
+            });
     }
 
     private void startCloudinaryUpload(String description) {
@@ -207,15 +279,14 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                 int length;
                 while ((length = is.read(buffer)) > 0) os.write(buffer, 0, length);
                 
-                // Kiểm tra dung lượng file trước khi up
                 if (tempFile.length() > 100 * 1024 * 1024) {
-                    runOnUiThread(() -> Toast.makeText(appCtx, "File too large for +Free (>100MB)", Toast.LENGTH_LONG).show());
+                    runOnUiThread(() -> Toast.makeText(appCtx, "File quá lớn (>100MB)", Toast.LENGTH_LONG).show());
                     tempFile.delete();
                     return;
                 }
 
                 runOnUiThread(() -> {
-                    Toast.makeText(appCtx, "Upload started in background", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(appCtx, "Đang bắt đầu tải lên...", Toast.LENGTH_SHORT).show();
                     finish(); 
                 });
 
@@ -225,14 +296,14 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                         .callback(new UploadCallback() {
                             @Override
                             public void onStart(String requestId) {
-                                mBuilder.setContentText("Uploading to Cloudinary...");
+                                mBuilder.setContentText("Đang tải video lên Cloudinary...");
                                 safeNotify();
                             }
 
                             @Override
                             public void onProgress(String requestId, long bytes, long totalBytes) {
                                 int progress = (int) (100.0 * bytes / totalBytes);
-                                mBuilder.setProgress(100, progress, false).setContentText("Uploading: " + progress + "%");
+                                mBuilder.setProgress(100, progress, false).setContentText("Đang tải: " + progress + "%");
                                 safeNotify();
                             }
 
@@ -242,8 +313,8 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                                 saveDataToFirestore(videoUrl, description, currentUid, finalUsername);
                                 tempFile.delete(); 
                                 
-                                mBuilder.setContentTitle("Upload Success")
-                                        .setContentText("Video is now live!")
+                                mBuilder.setContentTitle("Tải lên thành công")
+                                        .setContentText("Video của bạn đã sẵn sàng!")
                                         .setProgress(0, 0, false)
                                         .setOngoing(false);
                                 safeNotify();
@@ -252,7 +323,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                             @Override
                             public void onError(String requestId, ErrorInfo error) {
                                 tempFile.delete();
-                                mBuilder.setContentTitle("Upload Failed")
+                                mBuilder.setContentTitle("Tải lên thất bại")
                                         .setContentText(error.getDescription())
                                         .setProgress(0, 0, false)
                                         .setOngoing(false);
@@ -263,7 +334,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                         }).dispatch();
 
             } catch (Exception e) {
-                Log.e(TAG, "Upload thread error: " + e.getMessage());
+                Log.e(TAG, "Upload error: " + e.getMessage());
             }
         }).start();
     }
@@ -283,12 +354,15 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         videoData.put("totalComments", 0);
         videoData.put("watchCount", 0);
         videoData.put("timestamp", System.currentTimeMillis());
+<<<<<<< HEAD
         videoData.put("moderationStatus", "pending"); // Chờ duyệt mặc định
+=======
+        videoData.put("hashtags", hashtags);
+>>>>>>> 1f858b265d7e4c5a09ce3a156bd65ddbed1b794d
 
         db.collection("videos").document(Id).set(videoData);
 
-        // Derive thumbnail from video URL (Cloudinary specific)
-        String thumbUrl = "https://picsum.photos/200/300"; // Fallback
+        String thumbUrl = "https://picsum.photos/200/300";
         if (videoUrl.contains("cloudinary.com")) {
             thumbUrl = videoUrl.replace(".mp4", ".jpg");
             if (thumbUrl.contains("/upload/")) {
