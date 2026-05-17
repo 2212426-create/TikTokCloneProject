@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../components/auth-provider';
-import { Play, AlertTriangle, Flag, Trash2, Check, RefreshCw, X, BrainCircuit, Loader2, Sparkles, ShieldAlert } from 'lucide-react';
+import { Play, AlertTriangle, Flag, Trash2, Check, RefreshCw, X, BrainCircuit, Loader2, Sparkles, ShieldAlert, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { db, collection, onSnapshot, doc, updateDoc, addDoc, Timestamp } from '../lib/firebase';
 import { moderateVideoContent } from '../lib/gemini';
@@ -12,7 +12,7 @@ type TabFilter = 'pending' | 'approved' | 'rejected';
 export function Moderation() {
   const { user } = useAuth();
   const adminName = user?.email || 'admin_unknown';
-  
+
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabFilter>('pending');
@@ -182,19 +182,19 @@ export function Moderation() {
           )}
 
           <div className="flex bg-surface-low rounded-lg p-1 border border-outline-variant/20 inline-flex">
-            <button 
+            <button
               onClick={() => setActiveTab('pending')}
               className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'pending' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
             >
               Chờ duyệt ({pendingCount})
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('approved')}
               className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'approved' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
             >
               Đã duyệt ({approvedCount})
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('rejected')}
               className={clsx("px-4 py-2 rounded-md font-label text-sm transition-all", activeTab === 'rejected' ? "bg-surface-highest text-on-surface shadow-sm font-bold" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-high")}
             >
@@ -214,9 +214,9 @@ export function Moderation() {
         <div className="text-center py-20 text-on-surface-variant">
           <p className="text-lg font-headline mb-2">Không có video nào</p>
           <p className="font-label text-sm">
-            {activeTab === 'pending' ? 'Tất cả video đã được xử lý.' : 
-             activeTab === 'approved' ? 'Chưa có video nào được duyệt.' : 
-             'Chưa có video nào bị từ chối.'}
+            {activeTab === 'pending' ? 'Tất cả video đã được xử lý.' :
+              activeTab === 'approved' ? 'Chưa có video nào được duyệt.' :
+                'Chưa có video nào bị từ chối.'}
           </p>
         </div>
       ) : (
@@ -232,17 +232,17 @@ export function Moderation() {
                 (video.aiFlagged || aiResult?.isViolation) && "border-error/30"
               )}>
                 {/* Thumbnail / Video Preview */}
-                <div 
+                <div
                   className="relative w-full aspect-[9/16] bg-surface-highest group cursor-pointer overflow-hidden"
                   onClick={() => setPlayingVideo(video)}
                 >
                   {video.videoUri ? (
-                    <video 
-                      src={video.videoUri} 
+                    <video
+                      src={video.videoUri}
                       className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-300"
                       muted
                       preload="metadata"
-                      onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => {})}
+                      onMouseEnter={(e) => (e.target as HTMLVideoElement).play().catch(() => { })}
                       onMouseLeave={(e) => { const v = e.target as HTMLVideoElement; v.pause(); v.currentTime = 0; }}
                     />
                   ) : (
@@ -250,7 +250,7 @@ export function Moderation() {
                       <Play className="w-12 h-12 text-on-surface-variant/30" />
                     </div>
                   )}
-                  
+
                   {/* Play Overlay */}
                   <div className="absolute inset-0 flex items-center justify-center bg-background/20 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="w-12 h-12 rounded-full bg-background/60 backdrop-blur flex items-center justify-center border border-on-surface/20">
@@ -261,20 +261,34 @@ export function Moderation() {
                   {/* Badges */}
                   <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
                     {video.aiFlagged || aiResult?.isViolation ? (
-                      <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-error-container/90 text-on-error-container border-error/20">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        AI: {aiResult?.confidence || video.aiConfidence}%
+                      <div className="backdrop-blur px-2.5 py-1 rounded flex items-center gap-1 font-label text-xs border bg-rose-500/25 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold shadow-sm">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                        AI: {aiResult?.confidence || video.aiConfidence}% Vi phạm
                       </div>
                     ) : aiResult && !aiResult.isViolation ? (
-                      <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-secondary-container/20 text-secondary-container border-secondary-container/20">
-                        <Sparkles className="w-3.5 h-3.5" />
+                      <div className="backdrop-blur px-2.5 py-1 rounded flex items-center gap-1 font-label text-xs border bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold shadow-sm">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
                         AI: An toàn
                       </div>
                     ) : (
-                      <div className="backdrop-blur px-2 py-0.5 rounded flex items-center gap-1 font-label text-xs border bg-surface-variant/90 text-on-surface-variant border-outline/20">
-                        <Flag className="w-3.5 h-3.5" />
-                        {activeTab === 'approved' ? 'Đã duyệt' : activeTab === 'rejected' ? 'Đã gỡ' : 'Chờ duyệt'}
-                      </div>
+                      <>
+                        {activeTab === 'approved' ? (
+                          <div className="backdrop-blur px-2.5 py-1 rounded flex items-center gap-1 font-label text-xs border bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-bold shadow-sm">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            Đã duyệt
+                          </div>
+                        ) : activeTab === 'rejected' ? (
+                          <div className="backdrop-blur px-2.5 py-1 rounded flex items-center gap-1 font-label text-xs border bg-rose-500/25 text-rose-600 dark:text-rose-400 border-rose-500/30 font-bold shadow-sm">
+                            <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                            Đã gỡ bỏ
+                          </div>
+                        ) : (
+                          <div className="backdrop-blur px-2.5 py-1 rounded flex items-center gap-1 font-label text-xs border bg-amber-500/25 text-amber-600 dark:text-amber-400 border-amber-500/30 font-bold shadow-sm">
+                            <Clock className="w-3.5 h-3.5 text-amber-500" />
+                            Chờ duyệt
+                          </div>
+                        )}
+                      </>
                     )}
                     <div className="bg-surface/80 backdrop-blur text-on-surface px-2 py-0.5 rounded font-label text-[10px]">
                       ❤ {video.totalLikes} · 👁 {video.watchCount}
@@ -309,17 +323,26 @@ export function Moderation() {
                   {/* AI Result Card */}
                   {aiResult && (
                     <div className={clsx(
-                      "p-3 rounded-lg mb-3 border text-xs font-label",
-                      aiResult.isViolation 
-                        ? "bg-error/10 border-error/20 text-error" 
-                        : "bg-secondary-container/10 border-secondary-container/20 text-secondary-container"
+                      "p-3 rounded-lg mb-3 border text-xs font-label shadow-sm transition-all duration-300",
+                      aiResult.isViolation
+                        ? "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400"
+                        : "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
                     )}>
-                      <div className="flex items-center gap-1.5 mb-1 font-medium">
-                        {aiResult.isViolation ? <ShieldAlert className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-                        {aiResult.isViolation ? `Vi phạm: ${aiResult.category}` : 'Nội dung an toàn'}
-                        <span className="ml-auto opacity-70">{aiResult.confidence}%</span>
+                      <div className="flex items-center gap-1.5 mb-1.5 font-bold text-sm">
+                        {aiResult.isViolation ? <ShieldAlert className="w-4 h-4 text-rose-500" /> : <Sparkles className="w-4 h-4 text-emerald-500" />}
+                        <span>{aiResult.isViolation ? `Vi phạm: ${aiResult.category}` : 'Nội dung an toàn'}</span>
+                        <span className={clsx(
+                          "ml-auto px-2 py-0.5 rounded text-[10px] font-extrabold",
+                          aiResult.isViolation
+                            ? "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                            : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                        )}>
+                          {aiResult.confidence}%
+                        </span>
                       </div>
-                      <p className="line-clamp-2 opacity-80">{aiResult.reason}</p>
+                      <p className="line-clamp-2 mt-1 text-xs opacity-90 font-medium leading-relaxed">
+                        {aiResult.reason}
+                      </p>
                     </div>
                   )}
 
@@ -338,7 +361,7 @@ export function Moderation() {
 
                       {rejectingId === video.videoId ? (
                         <div className="space-y-2">
-                          <input 
+                          <input
                             type="text"
                             placeholder="Lý do từ chối..."
                             value={rejectReason}
@@ -346,13 +369,13 @@ export function Moderation() {
                             className="w-full bg-surface border border-outline-variant/20 text-on-surface font-label text-sm p-2 rounded outline-none focus:border-error"
                           />
                           <div className="grid grid-cols-2 gap-2">
-                            <button 
+                            <button
                               onClick={() => handleReject(video.videoId)}
                               className="py-2 rounded bg-error text-on-error hover:bg-error/90 font-label text-sm font-bold transition-colors"
                             >
                               Xác nhận gỡ
                             </button>
-                            <button 
+                            <button
                               onClick={() => { setRejectingId(null); setRejectReason(''); }}
                               className="py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-high font-label text-sm transition-colors"
                             >
@@ -362,13 +385,13 @@ export function Moderation() {
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 gap-2">
-                          <button 
+                          <button
                             onClick={() => setRejectingId(video.videoId)}
                             className="py-2 rounded border border-error text-error hover:bg-error/10 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" /> Gỡ bỏ
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleApprove(video.videoId)}
                             className="py-2 rounded bg-secondary-container/20 text-secondary-container border border-secondary-container/30 hover:bg-secondary-container/30 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
                           >
@@ -382,15 +405,9 @@ export function Moderation() {
                   {/* Actions for APPROVED - can now REJECT */}
                   {activeTab === 'approved' && (
                     <div className="mt-auto space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/10 text-secondary-container font-label text-xs border border-secondary-container/20">
-                          <Check className="w-3.5 h-3.5" />
-                          Đã duyệt
-                        </span>
-                      </div>
                       {rejectingId === video.videoId ? (
                         <div className="space-y-2">
-                          <input 
+                          <input
                             type="text"
                             placeholder="Lý do gỡ bỏ..."
                             value={rejectReason}
@@ -398,13 +415,13 @@ export function Moderation() {
                             className="w-full bg-surface border border-outline-variant/20 text-on-surface font-label text-sm p-2 rounded outline-none focus:border-error"
                           />
                           <div className="grid grid-cols-2 gap-2">
-                            <button 
+                            <button
                               onClick={() => handleReject(video.videoId)}
                               className="py-2 rounded bg-error text-on-error hover:bg-error/90 font-label text-sm font-bold transition-colors"
                             >
                               Xác nhận gỡ
                             </button>
-                            <button 
+                            <button
                               onClick={() => { setRejectingId(null); setRejectReason(''); }}
                               className="py-2 rounded border border-outline-variant text-on-surface hover:bg-surface-high font-label text-sm transition-colors"
                             >
@@ -413,7 +430,7 @@ export function Moderation() {
                           </div>
                         </div>
                       ) : (
-                        <button 
+                        <button
                           onClick={() => setRejectingId(video.videoId)}
                           className="w-full py-2 rounded border border-error/50 text-error hover:bg-error/10 font-label text-sm flex items-center justify-center gap-1.5 transition-colors"
                         >
@@ -430,7 +447,7 @@ export function Moderation() {
                         <X className="w-3.5 h-3.5" />
                         Đã gỡ bỏ
                       </span>
-                      <button 
+                      <button
                         onClick={() => handleApprove(video.videoId)}
                         className="text-xs font-label text-primary hover:underline"
                       >
@@ -451,10 +468,10 @@ export function Moderation() {
             {/* Video Player */}
             <div className="relative flex-1 bg-black flex items-center justify-center min-h-[50vh] md:min-h-[80vh]">
               {playingVideo.videoUri ? (
-                <video 
-                  src={playingVideo.videoUri} 
-                  controls 
-                  autoPlay 
+                <video
+                  src={playingVideo.videoUri}
+                  controls
+                  autoPlay
                   className="max-w-full max-h-[80vh] w-auto h-auto object-contain"
                 />
               ) : (
@@ -464,19 +481,19 @@ export function Moderation() {
                 </div>
               )}
             </div>
-            
+
             {/* Video Details Side Panel */}
             <div className="w-full md:w-80 flex flex-col bg-surface-low border-l border-outline-variant/10">
               <div className="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-surface">
                 <h3 className="font-headline font-bold text-on-surface truncate">Chi tiết Video</h3>
-                <button 
+                <button
                   onClick={() => setPlayingVideo(null)}
                   className="p-1.5 text-on-surface-variant hover:bg-surface-high hover:text-on-surface rounded-full transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              
+
               <div className="p-4 flex-1 overflow-y-auto space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
@@ -487,11 +504,11 @@ export function Moderation() {
                     <p className="text-xs text-on-surface-variant">{new Date(playingVideo.timestamp).toLocaleString('vi-VN')}</p>
                   </div>
                 </div>
-                
+
                 <div className="bg-surface-high/50 p-3 rounded-lg border border-outline-variant/10">
                   <p className="font-body text-sm text-on-surface whitespace-pre-wrap">{playingVideo.description || 'Không có mô tả'}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-2 text-center py-2">
                   <div className="bg-surface p-2 rounded border border-outline-variant/10">
                     <p className="text-xs text-on-surface-variant mb-1">Lượt thích</p>
@@ -507,7 +524,7 @@ export function Moderation() {
                   </div>
                 </div>
               </div>
-              
+
               {/* Quick Actions in Player */}
               {user?.role !== 'viewer' && activeTab === 'pending' && (
                 <div className="p-4 border-t border-outline-variant/10 flex gap-2 bg-surface">

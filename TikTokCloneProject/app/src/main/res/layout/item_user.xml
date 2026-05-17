@@ -1,24 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_items"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="5dp"
-    android:id="@+id/layout_items">
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="10dp">
+
+    <de.hdodenhof.circleimageview.CircleImageView
+        android:id="@+id/imv_user_avatar"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginEnd="15dp"
+        android:src="@drawable/default_avatar" />
 
     <TextView
         android:id="@+id/text_Username"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_weight="1"
         android:text="user1"
-        android:fontFamily="@font/montserrat_medium"
+        android:textSize="16sp"
         android:textColor="?attr/colorOnPrimary"
-        android:padding="15dp"
-        />
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:background="@color/tiktok_grey"
-        android:layout_marginVertical="12dp"
-        android:layout_marginHorizontal="20dp"/>
+        android:textStyle="bold"
+        android:fontFamily="@font/montserrat_medium" />
 
 </LinearLayout>

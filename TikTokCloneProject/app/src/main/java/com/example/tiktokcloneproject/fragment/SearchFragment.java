@@ -148,7 +148,12 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
                     if (task.isSuccessful() && task.getResult() != null) {
                         userArrayList.clear();
                         for (QueryDocumentSnapshot doc : task.getResult()) {
-                            userArrayList.add(new User(doc.getId(), doc.getString("username")));
+                            userArrayList.add(new User(
+                                    doc.getId(),
+                                    doc.getString("username"),
+                                    doc.getString("avatarUrl"),
+                                    doc.getString("email")
+                            ));
                         }
                         userAdapter.notifyDataSetChanged();
                     }

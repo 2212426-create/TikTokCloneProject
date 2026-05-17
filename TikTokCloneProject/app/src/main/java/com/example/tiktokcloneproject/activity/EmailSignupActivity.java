@@ -99,18 +99,36 @@ public class EmailSignupActivity extends AppCompatActivity {
                                 username = "user_" + id.substring(0, 5);
                             }
                             
-                            User user = new User(id, username, "", firebaseUser.getEmail());
-                            db.collection("users").document(id).set(user.toMap());
+                            final String finalUsername = username;
                             
-                            Profile profile = new Profile(id, username);
-                            db.collection("profiles").document(id).set(profile.toMap())
-                                    .addOnCompleteListener(t -> {
-                                        if (dialog != null) dialog.dismiss();
-                                        Intent intent = new Intent(EmailSignupActivity.this, HomeScreenActivity.class);
-                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                        startActivity(intent);
-                                        finish();
-                                    });
+                            // KIỂM TRA TRÁNH GHI ĐÈ: Nếu đã tồn tại dữ liệu user trên Firestore, không được ghi đè!
+                            db.collection("users").document(id).get().addOnCompleteListener(userTask -> {
+                                if (userTask.isSuccessful() && userTask.getResult() != null && userTask.getResult().exists()) {
+                                    // Người dùng đã tồn tại -> Chỉ đăng nhập thẳng, giữ nguyên avatar & role cũ
+                                    if (dialog != null) dialog.dismiss();
+                                    Intent intent = new Intent(EmailSignupActivity.this, HomeScreenActivity.class);
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                    startActivity(intent);
+                                    finish();
+                                } else {
+                                    // Người dùng mới -> Tạo dữ liệu mặc định ban đầu
+                                    User user = new User(id, finalUsername, "", firebaseUser.getEmail());
+                                    java.util.Map<String, Object> userData = user.toMap();
+                                    userData.put("status", "active");
+                                    userData.put("role", "user");
+                                    db.collection("users").document(id).set(userData);
+                                    
+                                    com.example.tiktokcloneproject.model.Profile profile = new com.example.tiktokcloneproject.model.Profile(id, finalUsername);
+                                    db.collection("profiles").document(id).set(profile.toMap())
+                                            .addOnCompleteListener(t -> {
+                                                if (dialog != null) dialog.dismiss();
+                                                Intent intent = new Intent(EmailSignupActivity.this, HomeScreenActivity.class);
+                                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                                startActivity(intent);
+                                                finish();
+                                            });
+                                }
+                            });
                         }
                     } else {
                         if (dialog != null) dialog.dismiss();

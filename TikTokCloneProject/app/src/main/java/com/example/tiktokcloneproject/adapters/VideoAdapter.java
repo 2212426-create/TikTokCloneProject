@@ -168,11 +168,21 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
             if (exoPlayer != null) { exoPlayer.release(); exoPlayer = null; videoView.setPlayer(null); }
         }
 
+        private void updateLikeUI(boolean liked) {
+            imvLike.setImageResource(R.drawable.ic_favorite);
+            if (liked) {
+                imvLike.setColorFilter(Color.parseColor("#FE2C55")); // Màu hồng/đỏ TikTok khi đã thả tim
+            } else {
+                imvLike.setColorFilter(Color.WHITE); // Màu trắng khi chưa thả tim
+            }
+        }
+
         public void setVideoObjects(Video video, int position) {
             if (video == null) return;
             this.currentVideo = video;
             this.authorId = video.getAuthorId();
             this.videoId = video.getVideoId();
+            imvAvatar.setImageResource(R.drawable.default_avatar);
 
             if (video.getVideoUri() != null) {
                 initPlayer();
@@ -181,9 +191,26 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
                 exoPlayer.setPlayWhenReady(position == currentPosition);
             }
 
-            // 1. Tên người dùng (@username)
+            // 1. Tên người dùng (@username) và Avatar - Tải động từ profiles
             String username = video.getUsername();
             tvTitle.setText(username != null && !username.isEmpty() ? "@" + username : "@User");
+            com.google.firebase.firestore.FirebaseFirestore.getInstance().collection("profiles").document(authorId)
+                    .get().addOnSuccessListener(doc -> {
+                        if (doc.exists()) {
+                            String realUsername = doc.getString("username");
+                            String avatarUrl = doc.getString("avatarUrl");
+                            if (realUsername != null && !realUsername.isEmpty()) {
+                                tvTitle.setText("@" + realUsername);
+                            }
+                            if (avatarUrl != null && !avatarUrl.isEmpty() && context != null) {
+                                com.bumptech.glide.Glide.with(context)
+                                        .load(avatarUrl)
+                                        .placeholder(R.drawable.default_avatar)
+                                        .circleCrop()
+                                        .into(imvAvatar);
+                            }
+                        }
+                    });
 
             // 2. Xử lý Mô tả và Hashtag
             String description = video.getDescription();
@@ -216,22 +243,40 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
                 // Loại bỏ hashtag khỏi mô tả để hiển thị sạch hơn bên dưới
                 cleanDescription = cleanDescription.replaceAll(REGEX, "").trim();
             } else {
-                // Video cũ chưa có hashtag -> Hiện trạng thái và nhờ AI cứu
-                tvHashtags.setText("#AI_đang_tìm_hashtag_viral...");
-                tvHashtags.setTextColor(Color.GRAY);
-                tvHashtags.setVisibility(View.VISIBLE);
-                
-                // GỌI AI: Truyền thêm 'context' để AI khởi chạy
-                LegacyHashtagFixer.fixSingleVideo(context, video);
+                // Ẩn view hashtag nếu video không có hashtag. 
+                // Đồng thời huỷ bỏ tự động gọi AI khi lướt feed để tránh cạn kiệt Quota API (Lỗi 429).
+                tvHashtags.setVisibility(View.GONE);
             }
 
             // Hiển thị Mô tả (nte / khinh khí cầu) - Nằm dưới Hashtag
             txvDescription.setText(cleanDescription.isEmpty() ? (description != null ? description : "") : cleanDescription);
 
-            // 3. MOCK DATA
-            tvFavorites.setText(video.getTotalLikes() > 0 ? String.valueOf(video.getTotalLikes()) : "12.1K");
-            tvComment.setText(video.getTotalComments() > 0 ? String.valueOf(video.getTotalComments()) : "850");
-            imvAvatar.setImageResource(R.drawable.default_avatar);
+            // 3. REAL-TIME DATA (Likes and Comments)
+            com.google.firebase.firestore.FirebaseFirestore firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+            firestore.collection("likes").document(videoId).addSnapshotListener((snapshot, error) -> {
+                if (snapshot != null && snapshot.exists()) {
+                    Map<String, Object> data = snapshot.getData();
+                    int likesCount = data != null ? data.size() : 0;
+                    tvFavorites.setText(String.valueOf(likesCount));
+                    
+                    String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null ? 
+                                        com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+                    isLiked = !currentUid.isEmpty() && data != null && data.containsKey(currentUid);
+                    updateLikeUI(isLiked);
+                } else {
+                    tvFavorites.setText("0");
+                    isLiked = false;
+                    updateLikeUI(false);
+                }
+            });
+
+            firestore.collection("comments").whereEqualTo("videoId", videoId).addSnapshotListener((snapshots, error) -> {
+                if (snapshots != null) {
+                    tvComment.setText(String.valueOf(snapshots.size()));
+                } else {
+                    tvComment.setText("0");
+                }
+            });
         }
 
         @Override public void onClick(View v) {
@@ -251,13 +296,57 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.VideoViewHol
         }
 
         private void toggleLikeLocal() {
-            isLiked = !isLiked;
-            imvLike.setImageResource(isLiked ? R.drawable.ic_favorite : R.drawable.ic_star_empty);
-            tvFavorites.setText(isLiked ? "12.2K" : "12.1K");
-            if (isLiked && currentVideo != null) {
-                RecommendationHelper.recordInterest(currentVideo.getDescription());
+            String currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null ? 
+                                com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid() : "";
+            if (currentUid.isEmpty()) {
+                Toast.makeText(context, "Vui lòng đăng nhập để thả tim!", Toast.LENGTH_SHORT).show();
+                return;
             }
-            Toast.makeText(context, isLiked ? "Đã thêm vào yêu thích" : "Đã bỏ yêu thích", Toast.LENGTH_SHORT).show();
+
+            isLiked = !isLiked;
+            updateLikeUI(isLiked);
+
+            com.google.firebase.firestore.FirebaseFirestore firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+            com.google.firebase.firestore.DocumentReference likeDocRef = firestore.collection("likes").document(videoId);
+            
+            if (isLiked) {
+                Map<String, Object> likeData = new HashMap<>();
+                likeData.put(currentUid, true);
+                likeDocRef.set(likeData, com.google.firebase.firestore.SetOptions.merge())
+                    .addOnSuccessListener(aVoid -> {
+                        updateFirestoreTotalLikes(firestore);
+                    })
+                    .addOnFailureListener(e -> {
+                        isLiked = false;
+                        updateLikeUI(false);
+                        Toast.makeText(context, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
+                
+                if (currentVideo != null) {
+                    RecommendationHelper.recordInterest(currentVideo.getDescription());
+                }
+            } else {
+                Map<String, Object> updates = new HashMap<>();
+                updates.put(currentUid, com.google.firebase.firestore.FieldValue.delete());
+                likeDocRef.update(updates)
+                    .addOnSuccessListener(aVoid -> {
+                        updateFirestoreTotalLikes(firestore);
+                    })
+                    .addOnFailureListener(e -> {
+                        isLiked = true;
+                        updateLikeUI(true);
+                        Toast.makeText(context, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    });
+            }
+        }
+
+        private void updateFirestoreTotalLikes(com.google.firebase.firestore.FirebaseFirestore firestore) {
+            firestore.collection("likes").document(videoId).get().addOnSuccessListener(snapshot -> {
+                if (snapshot != null && snapshot.exists()) {
+                    int newLikesCount = snapshot.getData() != null ? snapshot.getData().size() : 0;
+                    firestore.collection("videos").document(videoId).update("totalLikes", newLikesCount);
+                }
+            });
         }
 
         private void shareDemo() {

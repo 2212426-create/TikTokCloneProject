@@ -317,6 +317,7 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
     }
 
     private Size chooseOptimalSize(Size[] choices, int width, int height) {
+        if (choices == null || choices.length == 0) return new Size(1280, 720);
         for (Size s : choices) {
             if (s.getWidth() == 1280 || s.getWidth() == 1920) return s;
         }
@@ -348,7 +349,9 @@ public class CameraActivity extends AppCompatActivity implements View.OnClickLis
 
     private void startUploadingActivity(Uri uri) {
         Intent i = new Intent(this, DescriptionVideoActivity.class);
+        i.setData(uri);
         i.putExtra("videoUri", uri.toString());
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(i);
     }
 
