@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-label: "Geist", ui-monospace, SFMono-Regular, monospace;
+
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface-low: var(--surface-low);
+  --color-surface: var(--surface);
+  --color-surface-high: var(--surface-high);
+  --color-surface-highest: var(--surface-highest);
+  --color-surface-variant: var(--surface-variant);
+  --color-surface-bright: var(--surface-bright);
+
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-primary-fixed: var(--primary-fixed);
+  --color-on-primary-fixed: var(--on-primary-fixed);
+
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-secondary-fixed: var(--secondary-fixed);
+  --color-on-secondary-fixed: var(--on-secondary-fixed);
+
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+}
+
+@layer base {
+  :root {
+    --surface-lowest: #ffffff;
+    --surface-low: #f8f9fa;
+    --surface: #f1f3f5;
+    --surface-high: #e9ecef;
+    --surface-highest: #dee2e6;
+    --surface-variant: #dee2e6;
+    --surface-bright: #ffffff;
+
+    --on-surface: #111111;
+    --on-surface-variant: #495057;
+
+    --outline: #ced4da;
+    --outline-variant: #dee2e6;
+
+    --primary: #ff0050;
+    --on-primary: #ffffff;
+    --primary-container: #ffdadb;
+    --on-primary-container: #40000d;
+    --primary-fixed: #ffb2b7;
+    --on-primary-fixed: #5b0017;
+
+    --secondary: #008b86;
+    --on-secondary: #ffffff;
+    --secondary-container: #c3fffa;
+    --on-secondary-container: #00201e;
+    --secondary-fixed: #29fcf3;
+    --on-secondary-fixed: #003735;
+
+    --tertiary: #5c5a5a;
+    --on-tertiary: #ffffff;
+    --tertiary-container: #e5e2e1;
+    --on-tertiary-container: #1c1b1b;
+
+    --error: #ba1a1a;
+    --on-error: #ffffff;
+    --error-container: #ffdad6;
+    --on-error-container: #410002;
+  }
+
+  .dark {
+    --surface-lowest: #0e0e0e;
+    --surface-low: #1b1b1c;
+    --surface: #131313;
+    --surface-high: #2a2a2a;
+    --surface-highest: #353535;
+    --surface-variant: #353535;
+    --surface-bright: #393939;
+
+    --on-surface: #e5e2e1;
+    --on-surface-variant: #e8bcbd;
+
+    --outline: #ae8789;
+    --outline-variant: #5e3e40;
+
+    --primary: #ff516a;
+    --on-primary: #ffffff;
+    --primary-container: #ffb2b7;
+    --on-primary-container: #5b0017;
+    --primary-fixed: #ffdadb;
+    --on-primary-fixed: #40000d;
+
+    --secondary: #00f0e8;
+    --on-secondary: #000000;
+    --secondary-container: #29fcf3;
+    --on-secondary-container: #003735;
+    --secondary-fixed: #c3fffa;
+    --on-secondary-fixed: #00201e;
+
+    --tertiary: #c8c6c5;
+    --on-tertiary: #313030;
+    --tertiary-container: #929090;
+    --on-tertiary-container: #2a2a29;
+
+    --error: #ffb4ab;
+    --on-error: #690005;
+    --error-container: #93000a;
+    --on-error-container: #ffdad6;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body antialiased selection:bg-primary-container selection:text-on-primary-container transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background-color: color-mix(in srgb, var(--color-surface-highest) 40%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+  
+  .glass-panel-hover:hover {
+    background-color: color-mix(in srgb, var(--color-surface-highest) 70%, transparent);
+    border-top: 1px solid var(--color-primary);
+  }
+
+  .text-gradient {
+    background: linear-gradient(90deg, var(--color-primary-container) 0%, var(--color-primary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
