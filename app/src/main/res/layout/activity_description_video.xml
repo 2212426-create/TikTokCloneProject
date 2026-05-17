@@ -1,79 +1,174 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".activity.DescriptionVideoActivity"
+    android:background="@color/tiktok_black"
     android:orientation="vertical"
-    android:padding="8dp">
+    tools:context=".activity.DescriptionVideoActivity">
 
-    <ImageView
-        android:id="@+id/btnBack"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_baseline_arrow_back_24"
-        android:padding="12dp"
-        android:contentDescription="Back" />
-
-    <LinearLayout
+    <!-- Header -->
+    <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="20dp"
-        android:gravity="center">
-
+        android:layout_height="wrap_content">
         <ImageView
+            android:id="@+id/btnBack"
             android:layout_width="wrap_content"
-            android:layout_height="300dp"
-            android:layout_weight="2"
-            android:id="@+id/imvShortCutVideo"/>
-
-        <EditText
-            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_margin="15dp"
-            android:inputType="textMultiLine"
-            android:scrollHorizontally="false"
-            android:id="@+id/edtDescription"
-            android:hint="@string/hint_description"
-            android:gravity="top"
-            android:background="@color/transparent"
-            android:padding="8dp"
-            android:maxLength="200"
-            android:maxLines="8"
-            android:lines="3"
-            android:textSize="12dp"
-            android:fontFamily="@font/montserrat_medium"
-            android:layout_marginRight="12dp"
-            />
-
-    </LinearLayout>
+            android:src="@drawable/ic_baseline_arrow_back_24"
+            android:padding="16dp"
+            app:tint="@color/tiktok_white"
+            android:contentDescription="Back" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Đăng video"
+            android:layout_centerInParent="true"
+            android:textColor="@color/tiktok_white"
+            android:fontFamily="@font/montserrat_bold"
+            android:textSize="18sp"/>
+    </RelativeLayout>
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="2dp"
-        android:background="@color/tiktok_grey"
-        android:layout_marginVertical="12dp"
-        android:layout_marginHorizontal="20dp"/>
+        android:layout_height="0.5dp"
+        android:background="@color/tiktok_grey"/>
 
-    <Button
-        android:id="@+id/btnDescription"
-        android:layout_width="wrap_content"
+    <!-- Scrollable content -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="match_parent"
+                android:layout_height="350dp"
+                android:id="@+id/imvShortCutVideo"
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/rounded_corner"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mô tả video"
+                android:textColor="@color/tiktok_white"
+                android:layout_marginTop="20dp"
+                android:fontFamily="@font/montserrat_bold"
+                android:textSize="16sp"/>
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/edt_shape"
+                android:layout_marginTop="10dp"
+                android:padding="8dp">
+
+                <EditText
+                    android:id="@+id/edtDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:fontFamily="@font/montserrat_medium"
+                    android:gravity="top"
+                    android:hint="Viết mô tả và tự thêm hashtag bằng dấu #..."
+                    android:textColor="@color/tiktok_white"
+                    android:textColorHint="@color/tiktok_grey"
+                    android:inputType="textMultiLine"
+                    android:minLines="4"
+                    android:maxLength="300"
+                    android:paddingEnd="10dp"
+                    android:textSize="14sp" />
+            </RelativeLayout>
+
+            <!-- Hashtag Toolbar -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="12dp">
+
+                <Button
+                    android:id="@+id/btnAddHashtag"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="# Hashtag"
+                    android:textAllCaps="false"
+                    android:textSize="12sp"
+                    android:textColor="@color/tiktok_white"
+                    android:backgroundTint="@color/tiktok_grey"
+                    style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minHeight="36dp"
+                    android:layout_marginEnd="12dp"/>
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"/>
+
+                <RelativeLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+
+                    <ImageButton
+                        android:id="@+id/btnAiSuggest"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/edt_shape"
+                        android:src="@drawable/ic_search"
+                        app:tint="@color/tiktok_red"
+                        android:contentDescription="AI Suggest" />
+
+                    <ProgressBar
+                        android:id="@+id/pbAiLoading"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_centerInParent="true"
+                        android:visibility="gone" />
+                </RelativeLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Gợi ý AI"
+                    android:textColor="@color/tiktok_red"
+                    android:textSize="12sp"
+                    android:layout_marginStart="8dp"
+                    android:fontFamily="@font/montserrat_medium"/>
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Post button area -->
+    <LinearLayout
+        android:id="@+id/layout_bottom_btn"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:background="@drawable/btn_red_shape"
-        android:drawableLeft="@drawable/ic_upload"
-        android:drawablePadding="4dp"
-        android:paddingVertical="5dp"
-        android:paddingHorizontal="10dp"
-        android:text="@string/post"
-        android:fontFamily="@font/montserrat_bold"
-        android:textColor="@color/tiktok_white"
-        android:textAllCaps="false"
-        android:textSize="14dp"
-        />
+        android:padding="16dp"
+        android:background="@color/tiktok_black">
+
+        <Button
+            android:id="@+id/btnDescription"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:background="@drawable/btn_red_shape"
+            android:text="ĐĂNG VIDEO"
+            android:fontFamily="@font/montserrat_bold"
+            android:textColor="@color/tiktok_white"
+            android:textAllCaps="true"
+            android:textSize="16sp"
+            app:backgroundTint="@null"/>
+    </LinearLayout>
 
 </LinearLayout>

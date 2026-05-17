@@ -27,7 +27,7 @@
         android:visibility="gone"
         android:alpha="0.8" />
 
-    <!-- UI Overlay (Avatar, Like, Comment, Description) -->
+    <!-- UI Overlay: Username -> Hashtag -> Description -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -45,13 +45,25 @@
             android:textSize="18sp"
             android:text="@string/username_label" />
 
+        <!-- Hashtag nằm NGAY DƯỚI tên người dùng -->
+        <TextView
+            android:id="@+id/tvHashtags"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#3D85C6"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="2dp"
+            android:visibility="gone" />
+
+        <!-- Mô tả video nằm ở dưới cùng -->
         <TextView
             android:id="@+id/txvDescription"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="@color/tiktok_white"
             android:textSize="14sp"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="4dp"
             android:text="Description" />
     </LinearLayout>
 
@@ -85,21 +97,31 @@
                 android:layout_marginBottom="-10dp" />
         </RelativeLayout>
 
+        <ImageView
+            android:id="@+id/imvLike"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:src="@drawable/ic_favorite" />
+
         <TextView
             android:id="@+id/tvFavorites"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:drawableTop="@drawable/ic_favorite"
             android:text="0"
             android:textColor="@color/tiktok_white"
             android:gravity="center"
             android:layout_marginBottom="15dp" />
 
+        <ImageView
+            android:id="@+id/imvComment"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:src="@drawable/ic_comment" />
+
         <TextView
             android:id="@+id/tvComment"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:drawableTop="@drawable/ic_comment"
             android:text="0"
             android:textColor="@color/tiktok_white"
             android:gravity="center"

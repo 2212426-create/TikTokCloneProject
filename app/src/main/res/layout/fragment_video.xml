@@ -10,7 +10,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical" />
 
-    <!-- Thanh loading chuẩn của Android, không lo bị crash do thiếu ảnh -->
     <ProgressBar
         android:id="@+id/loadingGif"
         android:layout_width="wrap_content"

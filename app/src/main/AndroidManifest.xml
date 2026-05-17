@@ -66,8 +66,7 @@
             android:exported="false" />
         <activity
             android:name=".activity.HomeScreenActivity"
-            android:exported="false"
-           />
+            android:exported="false" />
         <activity
             android:name=".activity.EmailSignInActivity"
             android:exported="false" />
@@ -93,9 +92,8 @@
             android:exported="false" />
         <activity
             android:name=".activity.DescriptionVideoActivity"
-            android:exported="false" /> <!-- <activity -->
-        <!-- android:name=".WaitingFragment" -->
-        <!-- android:exported="false" /> -->
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".activity.ChangePasswordActivity"
             android:exported="false" />

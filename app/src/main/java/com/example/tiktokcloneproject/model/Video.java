@@ -1,14 +1,18 @@
 package com.example.tiktokcloneproject.model;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Video {
     private String videoId, videoUri, authorId, description, username;
     private int totalLikes, totalComments, watchCount;
     private long timestamp;
+    private List<String> hashtags;
 
     public Video() {
+        this.hashtags = new ArrayList<>();
     }
 
     public Video(String videoId, String videoUri, String authorId, String username, String description, long timestamp) {
@@ -21,6 +25,7 @@ public class Video {
         this.totalLikes = 0;
         this.totalComments = 0;
         this.watchCount = 0;
+        this.hashtags = new ArrayList<>();
     }
 
     public String getUsername() { return username; }
@@ -50,6 +55,9 @@ public class Video {
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
 
+    public List<String> getHashtags() { return hashtags; }
+    public void setHashtags(List<String> hashtags) { this.hashtags = hashtags; }
+
     public Map<String, Object> toMap() {
         HashMap<String, Object> result = new HashMap<>();
         result.put("videoId", videoId);
@@ -61,6 +69,7 @@ public class Video {
         result.put("totalLikes", totalLikes);
         result.put("watchCount", watchCount);
         result.put("timestamp", timestamp);
+        result.put("hashtags", hashtags);
         return result;
     }
 }

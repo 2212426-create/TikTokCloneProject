@@ -14,6 +14,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.tiktokcloneproject.R;
 import com.example.tiktokcloneproject.adapters.VideoAdapter;
+import com.example.tiktokcloneproject.helper.RecommendationHelper;
 import com.example.tiktokcloneproject.model.Video;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -23,6 +24,7 @@ import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class VideoFragment extends Fragment {
     private Context context = null;
@@ -82,8 +84,18 @@ public class VideoFragment extends Fragment {
             }
         });
 
-        loadVideos();
+        loadRecommendedVideos();
         return layout;
+    }
+
+    private void loadRecommendedVideos() {
+        RecommendationHelper.getTopInterests().addOnSuccessListener(interests -> {
+            if (interests == null || interests.isEmpty()) {
+                loadVideos(null); // Không có sở thích thì load mặc định
+            } else {
+                loadVideos(interests);
+            }
+        }).addOnFailureListener(e -> loadVideos(null));
     }
 
     public void pauseVideo() {
@@ -98,12 +110,12 @@ public class VideoFragment extends Fragment {
         }
     }
 
-    private void loadVideos() {
+    private void loadVideos(List<String> interests) {
         if (db == null) return;
         
-        // FIX: Thêm orderBy để hiện video mới nhất lên đầu và tăng limit
-        videoListener = db.collection("videos")
-                .orderBy("timestamp", Query.Direction.DESCENDING)
+        Query query = db.collection("videos");
+        
+        videoListener = query.orderBy("timestamp", Query.Direction.DESCENDING)
                 .limit(50)
                 .addSnapshotListener((snapshots, e) -> {
                     if (e != null) {
@@ -124,7 +136,6 @@ public class VideoFragment extends Fragment {
 
                             switch (dc.getType()) {
                                 case ADDED:
-                                    // Chèn vào đúng vị trí Index để đảm bảo thứ tự thời gian
                                     if (newIndex <= videos.size()) {
                                         videos.add(newIndex, video);
                                         videoAdapter.notifyItemInserted(newIndex);
