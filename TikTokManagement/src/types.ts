@@ -3,7 +3,7 @@
 // =============================================
 
 // --- User ---
-export type UserRole = 'admin' | 'moderator' | 'user';
+export type UserRole = 'admin' | 'moderator' | 'viewer' | 'user';
 export type UserStatus = 'active' | 'banned' | 'warned';
 
 export interface User {

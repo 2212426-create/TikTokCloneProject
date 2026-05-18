@@ -45,6 +45,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.storage.FirebaseStorage;
@@ -58,8 +59,7 @@ public class CommentActivity extends Activity implements View.OnClickListener{
     private LinearLayout llComment;
     private EditText edtComment;
     private ImageButton imbSendComment;
-    private String videoId, userId, avatarName;
-    private Uri avatarUri;
+    private String videoId, userId;
     private Bitmap bitmap;
     private ListView lvComment;
     FirebaseAuth mAuth;
@@ -232,8 +232,9 @@ public class CommentActivity extends Activity implements View.OnClickListener{
     }
 
     private void updateTotal() {
+        totalComments += 1;
         db.collection("videos").document(videoId)
-                .update("totalComments", totalComments + 1)
+                .update("totalComments", FieldValue.increment(1))
                 .addOnSuccessListener(new OnSuccessListener<Void>() {
                     @Override
                     public void onSuccess(Void aVoid) {

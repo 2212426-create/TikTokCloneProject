@@ -95,10 +95,16 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         db = FirebaseFirestore.getInstance();
 
         Intent intent = getIntent();
-        if (intent != null && intent.getExtras() != null) {
-            String videoPath = intent.getExtras().getString("videoUri");
-            if (videoPath != null) {
-                videoUri = Uri.parse(videoPath);
+        if (intent != null) {
+            if (intent.getData() != null) {
+                videoUri = intent.getData();
+            } else if (intent.getExtras() != null) {
+                String videoPath = intent.getExtras().getString("videoUri");
+                if (videoPath != null) {
+                    videoUri = Uri.parse(videoPath);
+                }
+            }
+            if (videoUri != null) {
                 processVideoMetadata();
             }
         }
@@ -139,7 +145,11 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         new Thread(() -> {
             MediaMetadataRetriever mmr = new MediaMetadataRetriever();
             try {
-                mmr.setDataSource(this, videoUri);
+                if (videoUri != null && "file".equals(videoUri.getScheme())) {
+                    mmr.setDataSource(videoUri.getPath());
+                } else {
+                    mmr.setDataSource(this, videoUri);
+                }
                 String durationStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
                 long duration = Long.parseLong(durationStr);
                 
@@ -273,14 +283,31 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         
         new Thread(() -> {
             File tempFile = new File(getCacheDir(), "upload_video_" + Id + ".mp4");
-            try (InputStream is = getContentResolver().openInputStream(videoUri);
-                 OutputStream os = new FileOutputStream(tempFile)) {
-                byte[] buffer = new byte[8192];
-                int length;
-                while ((length = is.read(buffer)) > 0) os.write(buffer, 0, length);
-                
+            InputStream is = null;
+            try {
+                if (videoUri != null && "file".equals(videoUri.getScheme())) {
+                    is = new java.io.FileInputStream(new File(videoUri.getPath()));
+                } else if (videoUri != null) {
+                    is = getContentResolver().openInputStream(videoUri);
+                }
+
+                if (is == null) {
+                    throw new IOException("Cannot open input stream for video URI: " + videoUri);
+                }
+
+                try (OutputStream os = new FileOutputStream(tempFile)) {
+                    byte[] buffer = new byte[8192];
+                    int length;
+                    while ((length = is.read(buffer)) > 0) os.write(buffer, 0, length);
+                } finally {
+                    try { is.close(); } catch (Exception ignored) {}
+                }
+
                 if (tempFile.length() > 100 * 1024 * 1024) {
-                    runOnUiThread(() -> Toast.makeText(appCtx, "File quá lớn (>100MB)", Toast.LENGTH_LONG).show());
+                    runOnUiThread(() -> {
+                        Toast.makeText(appCtx, "File quá lớn (>100MB)", Toast.LENGTH_LONG).show();
+                        btnDescription.setEnabled(true);
+                    });
                     tempFile.delete();
                     return;
                 }
@@ -323,8 +350,9 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                             @Override
                             public void onError(String requestId, ErrorInfo error) {
                                 tempFile.delete();
+                                String desc = error != null ? error.getDescription() : "Lỗi không xác định";
                                 mBuilder.setContentTitle("Tải lên thất bại")
-                                        .setContentText(error.getDescription())
+                                        .setContentText(desc)
                                         .setProgress(0, 0, false)
                                         .setOngoing(false);
                                 safeNotify();
@@ -335,6 +363,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
 
             } catch (Exception e) {
                 Log.e(TAG, "Upload error: " + e.getMessage());
+                runOnUiThread(() -> btnDescription.setEnabled(true));
             }
         }).start();
     }
@@ -354,6 +383,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         videoData.put("totalComments", 0);
         videoData.put("watchCount", 0);
         videoData.put("timestamp", System.currentTimeMillis());
+        videoData.put("moderationStatus", "pending"); // Chờ duyệt mặc định
         videoData.put("hashtags", hashtags);
 
         db.collection("videos").document(Id).set(videoData);

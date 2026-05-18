@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public class Video {
-    private String videoId, videoUri, authorId, description, username;
+    private String videoId, videoUri, authorId, description, username, moderationStatus;
     private int totalLikes, totalComments, watchCount;
     private long timestamp;
     private List<String> hashtags;
@@ -65,6 +65,7 @@ public class Video {
         result.put("authorId", authorId);
         result.put("username", username);
         result.put("description", description);
+        if (moderationStatus != null) result.put("moderationStatus", moderationStatus);
         result.put("totalComments", totalComments);
         result.put("totalLikes", totalLikes);
         result.put("watchCount", watchCount);
@@ -72,4 +73,6 @@ public class Video {
         result.put("hashtags", hashtags);
         return result;
     }
+    public String getModerationStatus() { return moderationStatus; }
+    public void setModerationStatus(String moderationStatus) { this.moderationStatus = moderationStatus; }
 }

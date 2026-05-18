@@ -10,8 +10,8 @@ import com.google.ai.client.generativeai.type.GenerationConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 
 public class GeminiHelper {
-    // API Key của Gemini
-    private static final String GEMINI_API_KEY = "AIzaSyCw3Z3vGilpO7eUg-gLNDO1JunJFjhq7XM";
+    // API Key của Gemini - Được nạp bảo mật từ BuildConfig tự động sinh
+    private static final String GEMINI_API_KEY = com.example.tiktokcloneproject.BuildConfig.GEMINI_API_KEY;
 
     public static ListenableFuture<GenerateContentResponse> suggestHashtags(Bitmap bitmap) {
         // Cấu hình tham số cho model Pro để có kết quả tốt nhất và phản hồi nhanh
@@ -24,7 +24,7 @@ public class GeminiHelper {
         GenerationConfig config = configBuilder.build();
 
         GenerativeModel gm = new GenerativeModel(
-                "gemini-1.5-pro", 
+                "gemini-3-flash-preview", 
                 GEMINI_API_KEY,
                 config
         );

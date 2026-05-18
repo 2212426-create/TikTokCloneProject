@@ -148,7 +148,12 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
                     if (task.isSuccessful() && task.getResult() != null) {
                         userArrayList.clear();
                         for (QueryDocumentSnapshot doc : task.getResult()) {
-                            userArrayList.add(new User(doc.getId(), doc.getString("username")));
+                            userArrayList.add(new User(
+                                    doc.getId(),
+                                    doc.getString("username"),
+                                    doc.getString("avatarUrl"),
+                                    doc.getString("email")
+                            ));
                         }
                         userAdapter.notifyDataSetChanged();
                     }
@@ -164,6 +169,11 @@ public class SearchFragment extends Fragment implements View.OnClickListener {
                     if (task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot doc : task.getResult()) {
+                            String modStatus = doc.getString("moderationStatus");
+                            if ("rejected".equals(modStatus) || "pending".equals(modStatus)) {
+                                continue;
+                            }
+                            
                             String thumb = doc.getString("thumbnailUri");
                             if (thumb == null || thumb.isEmpty()) {
                                 thumb = doc.getString("videoUri"); // Fallback to video URI (handled by adapter)

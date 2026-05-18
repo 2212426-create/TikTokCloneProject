@@ -20,6 +20,8 @@ import com.example.tiktokcloneproject.model.User;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.bumptech.glide.Glide;
+import de.hdodenhof.circleimageview.CircleImageView;
 
 public class UserAdapter extends RecyclerView.Adapter<UserAdapter.userItems> implements Filterable {
     private List<User> listUser;
@@ -53,16 +55,19 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.userItems> imp
             return;
         }
         holder.text_Username.setText(user.getUsername());
+        
+        // Load avatar using Glide
+        if (mainContext != null) {
+            Glide.with(mainContext)
+                 .load(user.getAvatarUrl() != null ? user.getAvatarUrl() : R.drawable.default_avatar)
+                 .placeholder(R.drawable.default_avatar)
+                 .error(R.drawable.default_avatar)
+                 .into(holder.imv_user_avatar);
+        }
+
         holder.layout_items.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-//                Bundle bundle = new Bundle();
-//                bundle.putString("id", user.getUserId());
-//                Intent intent = new Intent(mainContext, ProfileActivity.class);
-//                intent.putExtras(bundle);
-//                mainContext.startActivity(intent);
-//                Toast.makeText(view.getContext(), user.getUserName(),
-//                        Toast.LENGTH_LONG).show();
                 Intent intent=new Intent(mainContext, ProfileActivity.class);
                 Bundle bundle = new Bundle();
                 bundle.putString("id",user.getUserId());
@@ -85,12 +90,14 @@ public class UserAdapter extends RecyclerView.Adapter<UserAdapter.userItems> imp
     public class userItems extends RecyclerView.ViewHolder{
         private TextView text_Username;
         private LinearLayout layout_items;
+        private CircleImageView imv_user_avatar;
 
 
         public userItems(@NonNull View itemView) {
             super(itemView);
             text_Username=(TextView) itemView.findViewById(R.id.text_Username);
             layout_items=(LinearLayout) itemView.findViewById(R.id.layout_items);
+            imv_user_avatar=(CircleImageView) itemView.findViewById(R.id.imv_user_avatar);
 
         }
     }

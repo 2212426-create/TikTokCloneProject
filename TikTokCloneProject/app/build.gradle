@@ -3,6 +3,11 @@ plugins {
     id 'com.google.gms.google-services' 
 }
 
+Properties properties = new Properties()
+if (project.rootProject.file('local.properties').exists()) {
+    properties.load(project.rootProject.file('local.properties').newDataInputStream())
+}
+
 android {
     namespace 'com.example.tiktokcloneproject'
     compileSdk 34
@@ -15,6 +20,9 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Định nghĩa GEMINI_API_KEY từ local.properties
+        buildConfigField "String", "GEMINI_API_KEY", "\"${properties.getProperty('GEMINI_API_KEY', '')}\""
     }
 
     buildTypes {
@@ -36,12 +44,13 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 }
 

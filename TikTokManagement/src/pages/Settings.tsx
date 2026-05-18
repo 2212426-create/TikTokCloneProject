@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Filter, Download, Lock, Trash2, ShieldAlert, Eye, ShieldCheck, ChevronLeft, ChevronRight, RefreshCw, CheckCircle, Video, UserX } from 'lucide-react';
+import { useAuth } from '../components/auth-provider';
+import { Filter, Download, Lock, Trash2, ShieldAlert, Eye, ShieldCheck, ChevronLeft, ChevronRight, RefreshCw, CheckCircle, Video, UserX, X } from 'lucide-react';
 import { clsx } from 'clsx';
-import { db, collection, onSnapshot, doc, updateDoc, addDoc, query, orderBy, Timestamp } from '../lib/firebase';
+import { db, collection, onSnapshot, doc, updateDoc, addDoc, query, orderBy, Timestamp, getDocs, where } from '../lib/firebase';
 import type { AuditLog } from '../types';
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
@@ -23,11 +24,15 @@ const ACTION_ICONS: Record<string, typeof Lock> = {
 };
 
 export function Settings() {
+  const { user } = useAuth();
+  const adminName = user?.email || 'admin_unknown';
+  
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState('moderator');
   const [staffEmail, setStaffEmail] = useState('');
   const [granting, setGranting] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'audit_logs'), orderBy('createdAt', 'desc'));
@@ -59,12 +64,34 @@ export function Settings() {
     
     setGranting(true);
     try {
+      let targetUserId = staffEmail.trim();
+
+      // Check if input is an email
+      if (targetUserId.includes('@')) {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('email', '==', targetUserId));
+        const querySnapshot = await getDocs(q);
+        
+        if (querySnapshot.empty) {
+          alert('Không tìm thấy người dùng nào với email này!');
+          setGranting(false);
+          return;
+        }
+        
+        targetUserId = querySnapshot.docs[0].id;
+      }
+
+      // Update role in Firestore
+      await updateDoc(doc(db, 'users', targetUserId), {
+        role: role
+      });
+
       // Log the role grant action
       await addDoc(collection(db, 'audit_logs'), {
-        adminId: 'admin_web',
+        adminId: adminName,
         action: 'CHANGE_ROLE',
-        targetId: staffEmail,
-        details: { newRole: role, grantedTo: staffEmail },
+        targetId: targetUserId,
+        details: { newRole: role, input: staffEmail },
         createdAt: Timestamp.now(),
       });
       alert(`Đã cấp quyền ${role} cho ${staffEmail} thành công!`);
@@ -97,6 +124,54 @@ export function Settings() {
     return colors[Math.abs(hash) % colors.length];
   };
 
+  const handleExportAuditCSV = () => {
+    if (auditLogs.length === 0) {
+      alert('Không có dữ liệu để xuất!');
+      return;
+    }
+
+    const actionLabel = (action: string) => ACTION_LABELS[action]?.label || action;
+
+    const escapeCSV = (val: string) => {
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const headers = [
+      'Th\u1eddi gian'.padEnd(22),
+      'Admin'.padEnd(35),
+      'H\u00e0nh \u0111\u1ed9ng'.padEnd(22),
+      'Target ID'.padEnd(30),
+      'Chi ti\u1ebft',
+    ];
+
+    const rows = auditLogs.map(log => {
+      const dt = new Date(log.createdAt);
+      const timestamp = dt.toLocaleString('vi-VN');
+      const details = Object.entries(log.details || {}).map(([k, v]) => `${k}: ${v}`).join(' | ');
+      return [
+        timestamp,
+        log.adminId,
+        actionLabel(log.action),
+        log.targetId,
+        details,
+      ].map(escapeCSV).join(',');
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `toptop_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="mb-8">
@@ -113,8 +188,11 @@ export function Settings() {
               <button className="flex items-center gap-2 px-3 py-1.5 bg-surface-low border border-outline-variant/20 rounded-md font-label text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-high transition-colors">
                 <Filter className="w-4 h-4" /> Lọc
               </button>
-              <button className="flex items-center gap-2 px-3 py-1.5 bg-surface-low border border-outline-variant/20 rounded-md font-label text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-high transition-colors">
-                <Download className="w-4 h-4" /> Xuất
+              <button 
+                onClick={handleExportAuditCSV}
+                className="flex items-center gap-2 px-3 py-1.5 bg-surface-low border border-outline-variant/20 rounded-md font-label text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-high transition-colors"
+              >
+                <Download className="w-4 h-4" /> Xuất CSV
               </button>
             </div>
           </div>
@@ -168,7 +246,11 @@ export function Settings() {
                     </div>
 
                     <div className="col-span-1 flex items-center justify-end">
-                      <button className="text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100">
+                      <button 
+                        onClick={() => setSelectedLog(log)}
+                        className="text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                        title="Xem chi tiết"
+                      >
                         <Eye className="w-5 h-5" />
                       </button>
                     </div>
@@ -264,9 +346,9 @@ export function Settings() {
                     <input 
                       type="radio" 
                       name="role" 
-                      value="user"
-                      checked={role === 'user'}
-                      onChange={() => setRole('user')}
+                      value="viewer"
+                      checked={role === 'viewer'}
+                      onChange={() => setRole('viewer')}
                       className="peer appearance-none w-4 h-4 rounded-full border border-outline-variant checked:border-primary checked:border-[4px] transition-all bg-surface" 
                     />
                   </div>
@@ -288,6 +370,58 @@ export function Settings() {
           </div>
         </section>
       </div>
+
+      {/* Audit Log Details Modal */}
+      {selectedLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-surface border border-outline-variant/20 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-outline-variant/10">
+              <h3 className="font-headline text-xl font-bold text-on-surface">Chi tiết Log</h3>
+              <button 
+                onClick={() => setSelectedLog(null)}
+                className="p-2 text-on-surface-variant hover:bg-surface-high hover:text-on-surface rounded-full transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 font-body text-sm text-on-surface">
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-semibold text-on-surface-variant">Thời gian:</span>
+                <span className="col-span-2">{new Date(selectedLog.createdAt).toLocaleString('vi-VN')}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-semibold text-on-surface-variant">Admin:</span>
+                <span className="col-span-2 font-mono bg-surface-low px-2 py-1 rounded inline-block w-fit">{selectedLog.adminId}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-semibold text-on-surface-variant">Hành động:</span>
+                <span className="col-span-2 font-semibold text-primary">{ACTION_LABELS[selectedLog.action]?.label || selectedLog.action}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <span className="font-semibold text-on-surface-variant">Target ID:</span>
+                <span className="col-span-2 font-mono break-all">{selectedLog.targetId}</span>
+              </div>
+              
+              <div className="pt-4 border-t border-outline-variant/10">
+                <span className="font-semibold text-on-surface-variant block mb-2">Chi tiết (JSON):</span>
+                <div className="bg-[#1e1e1e] rounded-xl overflow-hidden shadow-inner border border-outline-variant/10">
+                  <pre className="p-4 text-xs font-mono text-[#e4e4e4] overflow-x-auto whitespace-pre-wrap">
+                    {JSON.stringify(selectedLog.details, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-outline-variant/10 flex justify-end bg-surface-low/50">
+              <button 
+                onClick={() => setSelectedLog(null)}
+                className="px-6 py-2 bg-surface-high hover:bg-surface-highest text-on-surface font-label text-sm rounded-lg transition-colors border border-outline-variant/20 shadow-sm"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

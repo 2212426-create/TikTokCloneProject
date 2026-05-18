@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 
 public class ProfileActivity extends FragmentActivity implements View.OnClickListener {
+    private final static String TAG = "ProfileActivity";
     final String USERNAME_LABEL = "username";
     private TextView txvFollowing, txvFollowers, txvLikes, txvUserName;
     private EditText edtBio;
@@ -144,30 +145,34 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
     }
 
     private void loadProfileData() {
+        if (userId != null && !userId.isEmpty()) {
+            syncFollowCounts(userId);
+        }
         if (docRef != null) {
-            docRef.get().addOnCompleteListener(task -> {
-                if (task.isSuccessful() && task.getResult() != null) {
-                    DocumentSnapshot document = task.getResult();
-                    if (document.exists()) {
-                        txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
-                        txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
-                        txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
-                        txvUserName.setText("@" + document.getString(USERNAME_LABEL));
-                        
-                        currentAvatarUrl = document.getString("avatarUrl");
-                        if (currentAvatarUrl != null) {
-                            Glide.with(this)
-                                    .load(currentAvatarUrl)
-                                    .placeholder(R.drawable.default_avatar)
-                                    .circleCrop()
-                                    .into(imvAvatarProfile);
-                        }
-                        
-                        String bio = document.getString("bio");
-                        if (bio != null && edtBio != null) {
-                            oldBioText = bio;
-                            edtBio.setText(bio);
-                        }
+            docRef.addSnapshotListener((document, e) -> {
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e);
+                    return;
+                }
+                if (document != null && document.exists()) {
+                    txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
+                    txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
+                    txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
+                    txvUserName.setText("@" + document.getString(USERNAME_LABEL));
+                    
+                    currentAvatarUrl = document.getString("avatarUrl");
+                    if (currentAvatarUrl != null) {
+                        Glide.with(this)
+                                .load(currentAvatarUrl)
+                                .placeholder(R.drawable.default_avatar)
+                                .circleCrop()
+                                .into(imvAvatarProfile);
+                    }
+                    
+                    String bio = document.getString("bio");
+                    if (bio != null && edtBio != null) {
+                        oldBioText = bio;
+                        edtBio.setText(bio);
                     }
                 }
             });
@@ -204,6 +209,14 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                     if (task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot document : task.getResult()) {
+                            String modStatus = document.getString("moderationStatus");
+                            if ("rejected".equals(modStatus)) {
+                                continue;
+                            }
+                            if ("pending".equals(modStatus) && (currentUserID == null || !currentUserID.equals(userId))) {
+                                continue;
+                            }
+
                             String thumb = document.getString("videoUri");
                             if (thumb == null || thumb.isEmpty()) {
                                 thumb = document.getString("thumbnailUri");
@@ -332,6 +345,20 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
         }
     }
 
+    private void syncFollowCounts(String uid) {
+        if (uid == null || uid.isEmpty()) return;
+        db.collection("profiles").document(uid).collection("followers").get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                int count = queryDocumentSnapshots != null ? queryDocumentSnapshots.size() : 0;
+                db.collection("profiles").document(uid).update("followers", count);
+            });
+        db.collection("profiles").document(uid).collection("following").get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                int count = queryDocumentSnapshots != null ? queryDocumentSnapshots.size() : 0;
+                db.collection("profiles").document(uid).update("following", count);
+            });
+    }
+
     private void handleUnfollowed() {
         if (btn == null) return;
         btn.setText("Follow");
@@ -339,11 +366,13 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
             if (user == null) { startActivity(new Intent(ProfileActivity.this, MainActivity.class)); return; }
             Map<String, Object> data = new HashMap<>(); data.put("userID", userId);
             db.collection("profiles").document(currentUserID).collection("following").document(userId).set(data).addOnSuccessListener(aVoid -> {
-                db.collection("profiles").document(currentUserID).update("following", FieldValue.increment(1));
+                syncFollowCounts(currentUserID);
                 handleFollowed();
             });
             Map<String, Object> data1 = new HashMap<>(); data1.put("userID", currentUserID);
-            db.collection("profiles").document(userId).collection("followers").document(currentUserID).set(data1).addOnSuccessListener(aVoid -> db.collection("profiles").document(userId).update("followers", FieldValue.increment(1)));
+            db.collection("profiles").document(userId).collection("followers").document(currentUserID).set(data1).addOnSuccessListener(aVoid -> {
+                syncFollowCounts(userId);
+            });
         });
     }
 
@@ -353,10 +382,12 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
         btn.setOnClickListener(view -> {
             if (user == null) return;
             db.collection("profiles").document(currentUserID).collection("following").document(userId).delete().addOnSuccessListener(aVoid -> {
-                db.collection("profiles").document(currentUserID).update("following", FieldValue.increment(-1));
+                syncFollowCounts(currentUserID);
                 handleUnfollowed();
             });
-            db.collection("profiles").document(userId).collection("followers").document(currentUserID).delete().addOnSuccessListener(aVoid -> db.collection("profiles").document(userId).update("followers", FieldValue.increment(-1)));
+            db.collection("profiles").document(userId).collection("followers").document(currentUserID).delete().addOnSuccessListener(aVoid -> {
+                syncFollowCounts(userId);
+            });
         });
     }
 
@@ -382,6 +413,7 @@ public class ProfileActivity extends FragmentActivity implements View.OnClickLis
                             if (userVideos.contains(document.getId())) totalLikes += document.getData().size();
                         }
                         if (txvLikes != null) txvLikes.setText(String.valueOf(totalLikes));
+                        db.collection("profiles").document(userId).update("likes", totalLikes);
                     }
                 });
             }

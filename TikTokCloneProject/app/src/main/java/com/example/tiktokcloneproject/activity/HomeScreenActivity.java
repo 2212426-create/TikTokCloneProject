@@ -23,7 +23,9 @@ import com.example.tiktokcloneproject.fragment.SearchFragment;
 import com.example.tiktokcloneproject.fragment.VideoFragment;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 
 public class HomeScreenActivity extends FragmentActivity implements View.OnClickListener{
 
@@ -35,6 +37,7 @@ public class HomeScreenActivity extends FragmentActivity implements View.OnClick
     private Button btnHome, btnAddVideo, btnInbox, btnProfile, btnSearch;
     private FirebaseUser user;
     private FirebaseFirestore db;
+    private ListenerRegistration userListener;
     private final static String TAG = "HomeScreenActivity";
     Intent fragmentIntent = null;
     Boolean openAppFromLink = false;
@@ -90,6 +93,52 @@ public class HomeScreenActivity extends FragmentActivity implements View.OnClick
         ft.commit();
 
     }//on Create
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (user != null) {
+            userListener = db.collection("users").document(user.getUid())
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) {
+                        Log.w(TAG, "Listen failed.", e);
+                        return;
+                    }
+
+                    if (snapshot != null && snapshot.exists()) {
+                        String status = snapshot.getString("status");
+                        if ("banned".equals(status)) {
+                            FirebaseAuth.getInstance().signOut();
+                            showBannedDialog();
+                        }
+                    }
+                });
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (userListener != null) {
+            userListener.remove();
+            userListener = null;
+        }
+    }
+
+    private void showBannedDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AlertDialogTheme);
+        builder.setIcon(R.drawable.splash_background)
+                .setTitle("Tài khoản bị khóa")
+                .setMessage("Tài khoản của bạn đã bị khóa do vi phạm tiêu chuẩn cộng đồng.")
+                .setPositiveButton("Đã hiểu", (dialog, which) -> {
+                    Intent intent = new Intent(HomeScreenActivity.this, MainActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(intent);
+                    finish();
+                })
+                .setCancelable(false)
+                .show();
+    }
 
     @Override
     public void onBackPressed() {

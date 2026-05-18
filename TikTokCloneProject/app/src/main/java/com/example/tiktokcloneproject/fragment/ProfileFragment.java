@@ -183,22 +183,23 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
         if (userId == null || userId.isEmpty()) return;
 
         if (docRef != null) {
-            docRef.get().addOnCompleteListener(task -> {
-                if (isAdded() && task.isSuccessful() && task.getResult() != null) {
-                    DocumentSnapshot document = task.getResult();
-                    if (document.exists()) {
-                        if (txvFollowing != null)
-                            txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
-                        if (txvFollowers != null)
-                            txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
-                        if (txvLikes != null)
-                            txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
-                        if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
-                        
-                        String avatarUrl = document.getString("avatarUrl");
-                        if (avatarUrl != null && imvAvatarProfile != null) {
-                            Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
-                        }
+            docRef.addSnapshotListener((document, e) -> {
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e);
+                    return;
+                }
+                if (isAdded() && document != null && document.exists()) {
+                    if (txvFollowing != null)
+                        txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
+                    if (txvFollowers != null)
+                        txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
+                    if (txvLikes != null)
+                        txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
+                    if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
+                    
+                    String avatarUrl = document.getString("avatarUrl");
+                    if (avatarUrl != null && imvAvatarProfile != null) {
+                        Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
                     }
                 }
             });
@@ -229,6 +230,14 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                     if (isAdded() && task.isSuccessful() && task.getResult() != null) {
                         videoSummaries.clear();
                         for (QueryDocumentSnapshot document : task.getResult()) {
+                            String modStatus = document.getString("moderationStatus");
+                            if ("rejected".equals(modStatus)) {
+                                continue;
+                            }
+                            if ("pending".equals(modStatus) && (currentUserID == null || !currentUserID.equals(userId))) {
+                                continue;
+                            }
+                            
                             String thumb = document.getString("videoUri");
                             if (thumb == null || thumb.isEmpty()) {
                                 thumb = document.getString("thumbnailUri");
@@ -251,29 +260,33 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
     @Override
     public void onStart() {
         super.onStart();
+        if (userId != null && !userId.isEmpty()) {
+            syncFollowCounts(userId);
+        }
         if (docRef != null) {
-            docRef.get().addOnCompleteListener(task -> {
-                if (isAdded() && task.isSuccessful() && task.getResult() != null) {
-                    DocumentSnapshot document = task.getResult();
-                    if (document.exists()) {
-                        if (txvFollowing != null)
-                            txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
-                        if (txvFollowers != null)
-                            txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
-                        if (txvLikes != null)
-                            txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
-                        if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
-                        
-                        String bio = document.getString("bio");
-                        if (bio != null && edtBio != null) {
-                            oldBioText = bio;
-                            edtBio.setText(bio);
-                        }
+            docRef.addSnapshotListener((document, e) -> {
+                if (e != null) {
+                    Log.w(TAG, "Listen failed.", e);
+                    return;
+                }
+                if (isAdded() && document != null && document.exists()) {
+                    if (txvFollowing != null)
+                        txvFollowing.setText(String.valueOf(document.get("following") != null ? document.get("following") : 0));
+                    if (txvFollowers != null)
+                        txvFollowers.setText(String.valueOf(document.get("followers") != null ? document.get("followers") : 0));
+                    if (txvLikes != null)
+                        txvLikes.setText(String.valueOf(document.get("likes") != null ? document.get("likes") : 0));
+                    if (txvUserName != null) txvUserName.setText("@" + document.getString(USERNAME_LABEL));
+                    
+                    String bio = document.getString("bio");
+                    if (bio != null && edtBio != null) {
+                        oldBioText = bio;
+                        edtBio.setText(bio);
+                    }
 
-                        String avatarUrl = document.getString("avatarUrl");
-                        if (avatarUrl != null && imvAvatarProfile != null) {
-                            Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
-                        }
+                    String avatarUrl = document.getString("avatarUrl");
+                    if (avatarUrl != null && imvAvatarProfile != null) {
+                        Glide.with(this).load(avatarUrl).placeholder(R.drawable.default_avatar).circleCrop().into(imvAvatarProfile);
                     }
                 }
             });
@@ -357,6 +370,20 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
         }
     }
 
+    private void syncFollowCounts(String uid) {
+        if (uid == null || uid.isEmpty()) return;
+        db.collection("profiles").document(uid).collection("followers").get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                int count = queryDocumentSnapshots != null ? queryDocumentSnapshots.size() : 0;
+                db.collection("profiles").document(uid).update("followers", count);
+            });
+        db.collection("profiles").document(uid).collection("following").get()
+            .addOnSuccessListener(queryDocumentSnapshots -> {
+                int count = queryDocumentSnapshots != null ? queryDocumentSnapshots.size() : 0;
+                db.collection("profiles").document(uid).update("following", count);
+            });
+    }
+
     private void handleUnfollowed() {
         if (btn == null) return;
         btn.setText("Follow");
@@ -366,12 +393,12 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             data.put("userID", userId);
             db.collection("profiles").document(currentUserID).collection("following").document(userId).set(data)
                     .addOnSuccessListener(aVoid -> {
-                        db.collection("profiles").document(currentUserID).update("following", FieldValue.increment(1));
+                        syncFollowCounts(currentUserID);
                         Map<String, Object> followerData = new HashMap<>();
                         followerData.put("userID", currentUserID);
                         db.collection("profiles").document(userId).collection("followers").document(currentUserID).set(followerData)
                                 .addOnSuccessListener(v -> {
-                                    db.collection("profiles").document(userId).update("followers", FieldValue.increment(1));
+                                    syncFollowCounts(userId);
                                     handleFollowed();
                                 });
                     });
@@ -385,10 +412,10 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
             if (currentUserID == null || userId == null) return;
             db.collection("profiles").document(currentUserID).collection("following").document(userId).delete()
                     .addOnSuccessListener(aVoid -> {
-                        db.collection("profiles").document(currentUserID).update("following", FieldValue.increment(-1));
+                        syncFollowCounts(currentUserID);
                         db.collection("profiles").document(userId).collection("followers").document(currentUserID).delete()
                                 .addOnSuccessListener(v -> {
-                                    db.collection("profiles").document(userId).update("followers", FieldValue.increment(-1));
+                                    syncFollowCounts(userId);
                                     handleUnfollowed();
                                 });
                     });
@@ -430,6 +457,7 @@ public class ProfileFragment extends Fragment implements View.OnClickListener {
                             }
                         }
                         if (txvLikes != null) txvLikes.setText(String.valueOf(totalLikes));
+                        db.collection("profiles").document(userId).update("likes", totalLikes);
                     }
                 });
             }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../components/auth-provider';
 import {
   Download,
-  UserPlus,
   Search,
   ChevronDown,
   RefreshCw,
@@ -19,6 +19,7 @@ import { UserModal } from '../components/UserModal';
 import { db, collection, onSnapshot, doc, updateDoc } from '../lib/firebase';
 
 export function Users() {
+  const { user: authUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -89,6 +90,63 @@ export function Users() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (filteredUsers.length === 0) {
+      alert('Không có dữ liệu để xuất!');
+      return;
+    }
+
+    const headers = ['User ID', 'Tên người dùng', 'Email', 'Số điện thoại', 'Vai trò', 'Trạng thái', 'Followers', 'Following', 'Likes', 'Ngày tạo'];
+
+    const roleLabel = (role: string) => {
+      switch (role) {
+        case 'admin': return 'Admin';
+        case 'moderator': return 'Moderator';
+        case 'viewer': return 'Viewer';
+        default: return 'User';
+      }
+    };
+    const statusLabel = (status: string) => {
+      switch (status) {
+        case 'active': return 'Hoạt động';
+        case 'banned': return 'Bị khóa';
+        case 'warned': return 'Cảnh cáo';
+        default: return status;
+      }
+    };
+
+    const escapeCSV = (val: string) => {
+      if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+        return `"${val.replace(/"/g, '""')}"`;
+      }
+      return val;
+    };
+
+    const rows = filteredUsers.map(u => [
+      u.userId,
+      u.username,
+      u.email,
+      u.phone || '',
+      roleLabel(u.role),
+      statusLabel(u.status),
+      u.followers.toString(),
+      u.following.toString(),
+      u.likes.toString(),
+      new Date(u.createdAt).toLocaleDateString('vi-VN'),
+    ].map(escapeCSV).join(','));
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `toptop_users_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const filteredUsers = users.filter(user => {
     const matchSearch = user.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         user.userId.toLowerCase().includes(searchTerm.toLowerCase());
@@ -105,13 +163,12 @@ export function Users() {
           <p className="text-on-surface-variant font-body text-base">Giám sát và quản lý trạng thái tài khoản trên hệ thống TopTop.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-lg font-label text-sm text-on-surface hover:bg-surface-high transition-colors">
+          <button 
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2 border border-outline-variant rounded-lg font-label text-sm text-on-surface hover:bg-surface-high transition-colors"
+          >
             <Download className="w-4 h-4" />
             Xuất CSV
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded-lg font-label text-sm hover:bg-primary/90 transition-colors shadow-lg shadow-primary/30">
-            <UserPlus className="w-4 h-4" />
-            Thêm người dùng
           </button>
         </div>
       </div>
@@ -235,22 +292,27 @@ export function Users() {
                       >
                         <Eye className="w-5 h-5" />
                       </button>
-                      {user.status === 'banned' ? (
-                        <button 
-                          onClick={() => handleUpdateStatus(user.userId, 'active')}
-                          className="p-1.5 text-on-surface-variant hover:text-secondary-container hover:bg-secondary-container/10 rounded transition-colors" 
-                          title="Mở khóa"
-                        >
-                          <Unlock className="w-5 h-5" />
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleUpdateStatus(user.userId, 'banned')}
-                          className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded transition-colors" 
-                          title="Khóa tài khoản"
-                        >
-                          <Lock className="w-5 h-5" />
-                        </button>
+                      
+                      {authUser?.role !== 'viewer' && (
+                        <>
+                          {user.status === 'banned' ? (
+                            <button 
+                              onClick={() => handleUpdateStatus(user.userId, 'active')}
+                              className="p-1.5 text-on-surface-variant hover:text-secondary-container hover:bg-secondary-container/10 rounded transition-colors" 
+                              title="Mở khóa"
+                            >
+                              <Unlock className="w-5 h-5" />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleUpdateStatus(user.userId, 'banned')}
+                              className="p-1.5 text-on-surface-variant hover:text-error hover:bg-error/10 rounded transition-colors" 
+                              title="Khóa tài khoản"
+                            >
+                              <Lock className="w-5 h-5" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
@@ -282,11 +344,11 @@ export function Users() {
       <UserModal 
         user={selectedUser} 
         isOpen={!!selectedUser} 
-        onClose={() => setSelectedUser(null)} 
+        onClose={() => setSelectedUser(null)}
         onUpdateStatus={handleUpdateStatus}
         onUpdateRole={handleUpdateRole}
       />
+
     </div>
   );
 }
-

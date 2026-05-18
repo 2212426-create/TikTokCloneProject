@@ -87,6 +87,16 @@ public class VideoActivity extends Activity {
                         if (document != null && document.exists()) {
                             Video video = document.toObject(Video.class);
                             if (video != null) {
+                                if ("rejected".equals(video.getModerationStatus())) {
+                                    android.widget.Toast.makeText(VideoActivity.this, "Video này đã bị gỡ bỏ do vi phạm tiêu chuẩn cộng đồng.", android.widget.Toast.LENGTH_LONG).show();
+                                    finish();
+                                    return;
+                                }
+                                if ("pending".equals(video.getModerationStatus()) && (user == null || !user.getUid().equals(video.getAuthorId()))) {
+                                    android.widget.Toast.makeText(VideoActivity.this, "Video đang được kiểm duyệt.", android.widget.Toast.LENGTH_LONG).show();
+                                    finish();
+                                    return;
+                                }
                                 videos.add(video);
                                 videoAdapter.notifyItemInserted(0);
                                 // Tự động chạy video đầu tiên sau khi load xong

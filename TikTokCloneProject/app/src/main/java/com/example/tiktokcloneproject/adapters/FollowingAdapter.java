@@ -58,11 +58,15 @@ public class FollowingAdapter extends BaseAdapter {
 
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         
+        // Đặt tag và reset ảnh để tránh bị trùng lặp hiển thị khi view được tái sử dụng (recycled)
+        imvAvatar.setTag(userId);
+        imvAvatar.setImageResource(R.drawable.default_avatar);
+        
         // Tải avatarUrl từ profile thay vì Firebase Storage
         db.collection("profiles").document(userId).get().addOnSuccessListener(doc -> {
-            if (doc.exists()) {
+            if (doc.exists() && userId.equals(imvAvatar.getTag())) {
                 String avatarUrl = doc.getString("avatarUrl");
-                if (avatarUrl != null) {
+                if (avatarUrl != null && !avatarUrl.isEmpty()) {
                     Glide.with(context)
                             .load(avatarUrl)
                             .placeholder(R.drawable.default_avatar)

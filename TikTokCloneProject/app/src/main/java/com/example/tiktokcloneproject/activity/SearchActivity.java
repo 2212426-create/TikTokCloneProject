@@ -126,20 +126,25 @@ public class SearchActivity extends Activity implements View.OnClickListener {
 
     private void getData(String key) {
         db.collection("users")
-                .orderBy(USERNAME_LABEL)
-                .startAt(key)
-                .endAt(key + "\uf8ff")
-                .limit(20)
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        ArrayList<User> newList = new ArrayList<>();
-                        for (QueryDocumentSnapshot document : task.getResult()) {
-                            newList.add(new User(document.getString("userId"), document.getString(USERNAME_LABEL)));
-                        }
-                        updateUserList(newList);
+            .orderBy(USERNAME_LABEL)
+            .startAt(key)
+            .endAt(key + "\uf8ff")
+            .limit(20)
+            .get()
+            .addOnCompleteListener(task -> {
+                if (task.isSuccessful() && task.getResult() != null) {
+                    ArrayList<User> newList = new ArrayList<>();
+                    for (QueryDocumentSnapshot document : task.getResult()) {
+                        newList.add(new User(
+                            document.getString("userId"),
+                            document.getString(USERNAME_LABEL),
+                            document.getString("avatarUrl"),
+                            document.getString("email")
+                        ));
                     }
-                });
+                    updateUserList(newList);
+                }
+            });
     }
 
     private void updateUserList(ArrayList<User> newList) {
