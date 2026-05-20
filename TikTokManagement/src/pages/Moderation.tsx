@@ -24,6 +24,7 @@ export function Moderation() {
   const [scanningId, setScanningId] = useState<string | null>(null);
   const [scanningAll, setScanningAll] = useState(false);
   const [aiResults, setAiResults] = useState<Map<string, AIModerationResult>>(new Map());
+  const [autoScanningIds, setAutoScanningIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'videos'), (snapshot) => {
@@ -43,6 +44,7 @@ export function Moderation() {
           moderationStatus: data.moderationStatus || 'approved',
           aiFlagged: data.aiFlagged || false,
           aiConfidence: data.aiConfidence || 0,
+          aiReviewed: data.aiReviewed || false,
           rejectedReason: data.rejectedReason || '',
           reviewedBy: data.reviewedBy || '',
         });
@@ -54,6 +56,67 @@ export function Moderation() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const pendingUnreviewedVideos = videos.filter(
+      (video) => video.moderationStatus === 'pending' && !video.aiReviewed && !autoScanningIds.has(video.videoId),
+    );
+
+    if (pendingUnreviewedVideos.length === 0) {
+      return;
+    }
+
+    setAutoScanningIds((prev) => {
+      const next = new Set(prev);
+      pendingUnreviewedVideos.forEach((video) => next.add(video.videoId));
+      return next;
+    });
+
+    const runAutoModeration = async () => {
+      for (const video of pendingUnreviewedVideos) {
+        try {
+          const result = await moderateVideoContent(video.description, video.username);
+          setAiResults((prev) => new Map(prev).set(video.videoId, result));
+
+          const updatePayload: Record<string, unknown> = {
+            aiFlagged: result.isViolation,
+            aiConfidence: result.confidence,
+            aiReviewed: true,
+          };
+
+          if (!result.isViolation) {
+            updatePayload.moderationStatus = 'approved';
+            updatePayload.reviewedBy = 'AI_AUTO';
+          }
+
+          await updateDoc(doc(db, 'videos', video.videoId), updatePayload);
+
+          if (!result.isViolation) {
+            await addDoc(collection(db, 'audit_logs'), {
+              adminId: 'AI_AUTO',
+              action: 'AUTO_APPROVE_VIDEO',
+              targetId: video.videoId,
+              details: {
+                confidence: result.confidence,
+                reason: result.reason || 'AI đánh giá nội dung an toàn',
+              },
+              createdAt: Timestamp.now(),
+            });
+          }
+        } catch (err) {
+          console.error('Auto moderation error for', video.videoId, err);
+        } finally {
+          setAutoScanningIds((prev) => {
+            const next = new Set(prev);
+            next.delete(video.videoId);
+            return next;
+          });
+        }
+      }
+    };
+
+    void runAutoModeration();
+  }, [autoScanningIds, videos]);
 
   const handleApprove = async (videoId: string) => {
     try {
@@ -104,11 +167,32 @@ export function Moderation() {
       const result = await moderateVideoContent(video.description, video.username);
       setAiResults((prev) => new Map(prev).set(video.videoId, result));
 
-      // Update Firestore with AI result
-      await updateDoc(doc(db, 'videos', video.videoId), {
+      const updatePayload: Record<string, unknown> = {
         aiFlagged: result.isViolation,
         aiConfidence: result.confidence,
-      });
+        aiReviewed: true,
+      };
+
+      // Auto-approve only when AI marks content as safe.
+      if (!result.isViolation) {
+        updatePayload.moderationStatus = 'approved';
+        updatePayload.reviewedBy = 'AI_AUTO';
+      }
+
+      await updateDoc(doc(db, 'videos', video.videoId), updatePayload);
+
+      if (!result.isViolation) {
+        await addDoc(collection(db, 'audit_logs'), {
+          adminId: 'AI_AUTO',
+          action: 'AUTO_APPROVE_VIDEO',
+          targetId: video.videoId,
+          details: {
+            confidence: result.confidence,
+            reason: result.reason || 'AI đánh giá nội dung an toàn',
+          },
+          createdAt: Timestamp.now(),
+        });
+      }
     } catch (err) {
       console.error('AI scan error:', err);
     } finally {
@@ -125,10 +209,33 @@ export function Moderation() {
       try {
         const result = await moderateVideoContent(video.description, video.username);
         setAiResults((prev) => new Map(prev).set(video.videoId, result));
-        await updateDoc(doc(db, 'videos', video.videoId), {
+
+        const updatePayload: Record<string, unknown> = {
           aiFlagged: result.isViolation,
           aiConfidence: result.confidence,
-        });
+          aiReviewed: true,
+        };
+
+        if (!result.isViolation) {
+          updatePayload.moderationStatus = 'approved';
+          updatePayload.reviewedBy = 'AI_AUTO';
+        }
+
+        await updateDoc(doc(db, 'videos', video.videoId), updatePayload);
+
+        if (!result.isViolation) {
+          await addDoc(collection(db, 'audit_logs'), {
+            adminId: 'AI_AUTO',
+            action: 'AUTO_APPROVE_VIDEO',
+            targetId: video.videoId,
+            details: {
+              confidence: result.confidence,
+              reason: result.reason || 'AI đánh giá nội dung an toàn',
+            },
+            createdAt: Timestamp.now(),
+          });
+        }
+
         // Delay to avoid rate limiting
         await new Promise((r) => setTimeout(r, 800));
       } catch (err) {

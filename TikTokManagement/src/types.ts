@@ -40,6 +40,7 @@ export interface Video {
   moderationStatus: ModerationStatus;
   aiFlagged: boolean;
   aiConfidence: number;
+  aiReviewed?: boolean;
   rejectedReason?: string;
   reviewedBy?: string;
 }
