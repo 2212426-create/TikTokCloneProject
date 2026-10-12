@@ -4,6 +4,7 @@ import '../../../core/providers/firebase_providers.dart';
 import '../repositories/legacy_hashtag_fixer.dart';
 import '../repositories/upload_repository.dart';
 import '../services/gemini_service.dart';
+import '../../upload/services/video_copyright_service.dart';
 
 /// Các trạng thái có thể có của tiến trình tải lên video
 enum UploadStatus { idle, uploading, saving, success, error }
@@ -58,8 +59,9 @@ final legacyHashtagFixerProvider = Provider<LegacyHashtagFixer>((ref) {
 /// Bộ quản lý trạng thái tải lên video (UploadNotifier)
 class UploadNotifier extends StateNotifier<UploadState> {
   final UploadRepository _repository;
+  final GeminiService _geminiService;
 
-  UploadNotifier(this._repository)
+  UploadNotifier(this._repository, this._geminiService)
     : super(UploadState(status: UploadStatus.idle));
 
   /// Thực thi toàn bộ quy trình: Tải lên Cloudinary -> Lưu thông tin Firestore
@@ -87,6 +89,45 @@ class UploadNotifier extends StateNotifier<UploadState> {
         },
       );
 
+      // --- KIỂM DUYỆT BẢN QUYỀN (NGƯỜI 2) ---
+      final copyrightService = VideoCopyrightService();
+      
+      // Tạo mock hash 64-bit từ file size (vì image_picker đổi tên file ngẫu nhiên mỗi lần chọn)
+      final fileSize = await file.length();
+      String mockHash = (fileSize.hashCode.abs()).toRadixString(16).padLeft(16, '0');
+      if (mockHash.length > 16) mockHash = mockHash.substring(0, 16);
+      List<String> newHashes = List.generate(5, (_) => mockHash);
+
+      final allVideos = await _repository.getAllVideosForCopyrightCheck();
+      
+      final bestMatch = await copyrightService.findMostSimilarVideo(
+        newHashes: newHashes,
+        databaseRecords: allVideos,
+      );
+
+      double visualSimilarity = bestMatch?['calculated_similarity'] ?? 0.0;
+      bool isSameAuthor = bestMatch?['author_id'] == authorId;
+
+      final eval = copyrightService.evaluateCopyrightRisk(
+        visualSimilarity: visualSimilarity,
+        audioSimilarity: visualSimilarity,
+        isSameAuthor: isSameAuthor,
+      );
+
+      if (eval.decision == CopyrightDecision.blocked || eval.decision == CopyrightDecision.duplicate) {
+        throw Exception(eval.message); // Chặn tải lên để tránh spam video trùng lặp
+      }
+
+      // TODO: Nếu pendingReview, có thể đánh dấu trạng thái moderationStatus là 'pending'
+      // Hiện tại hàm saveVideoToFirestore đang hardcode 'approved', ta sẽ cần xử lý truyền tham số nếu cần
+
+      // --- KIỂM DUYỆT AI & PHÂN LOẠI NÔNG NGHIỆP (NGƯỜI 1 & 3) ---
+      // Gọi model mock để lấy metadata
+      final aiMetadata = await _geminiService.mockAnalyzeVideo();
+      // Ta có thể nối thêm hashtag AI gợi ý vào hashtags do người dùng nhập
+      final List<String> combinedHashtags = List.from(hashtags)
+        ..addAll((aiMetadata['suggested_hashtags'] as List<String>));
+
       // 2. Chuyển trạng thái lưu Firestore
       state = state.copyWith(status: UploadStatus.saving);
 
@@ -96,11 +137,12 @@ class UploadNotifier extends StateNotifier<UploadState> {
         description: description,
         authorId: authorId,
         username: username,
-        hashtags: hashtags,
+        hashtags: combinedHashtags.toSet().toList(), // Lọc trùng
         location: location,
         allowDownload: allowDownload,
         allowDuet: allowDuet,
         isCopyrightProtected: isCopyrightProtected,
+        keyframesPhash: newHashes,
       );
 
       // 3. Kết thúc thành công
@@ -125,5 +167,8 @@ class UploadNotifier extends StateNotifier<UploadState> {
 final uploadStateProvider = StateNotifierProvider<UploadNotifier, UploadState>((
   ref,
 ) {
-  return UploadNotifier(ref.watch(uploadRepositoryProvider));
+  return UploadNotifier(
+    ref.watch(uploadRepositoryProvider),
+    ref.watch(geminiServiceProvider),
+  );
 });

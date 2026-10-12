@@ -131,6 +131,7 @@ class UploadRepository {
     bool allowDownload = true,
     bool allowDuet = true,
     bool isCopyrightProtected = false,
+    List<String>? keyframesPhash,
   }) async {
     // 1. Tạo bản ghi video gốc trong bộ sưu tập "videos"
     final videoData = {
@@ -149,6 +150,7 @@ class UploadRepository {
       'allowDownload': allowDownload,
       'allowDuet': allowDuet,
       'isCopyrightProtected': isCopyrightProtected,
+      if (keyframesPhash != null) 'keyframes_phash': keyframesPhash,
     };
 
     await _firestore
@@ -197,5 +199,25 @@ class UploadRepository {
       });
     }
     await batch.commit();
+  }
+
+  /// Lấy danh sách vân tay video để đối soát bản quyền
+  Future<List<Map<String, dynamic>>> getAllVideosForCopyrightCheck() async {
+    final snapshot = await _firestore.collection('videos').get();
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      
+      // Lấy vân tay đã lưu trong CSDL, nếu không có thì mặc định là chuỗi rỗng
+      List<String> phash = [];
+      if (data['keyframes_phash'] != null) {
+        phash = List<String>.from(data['keyframes_phash']);
+      }
+      
+      return {
+        'video_id': data['videoId'],
+        'author_id': data['authorId'],
+        'keyframes_phash': phash,
+      };
+    }).toList();
   }
 }
