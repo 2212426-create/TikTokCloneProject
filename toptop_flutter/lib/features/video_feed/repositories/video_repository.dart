@@ -46,7 +46,7 @@ class VideoRepository {
 
     final allVideos = snapshot.docs
         .map((doc) => VideoModel.fromMap(doc.data(), doc.id))
-        .where((v) => v.moderationStatus != 'rejected') // Hiển thị cả pending và approved
+        .where((v) => v.moderationStatus == 'approved')
         .toList();
 
     // 1. NGƯỜI DÙNG CHƯA ĐĂNG NHẬP: Trả về ngẫu nhiên để test và đa dạng
@@ -94,7 +94,7 @@ class VideoRepository {
 
     final allVideos = snapshot.docs
         .map((doc) => VideoModel.fromMap(doc.data(), doc.id))
-        .where((v) => v.moderationStatus != 'rejected')
+        .where((v) => v.moderationStatus == 'approved')
         .toList();
 
     // Chấm điểm từng video theo thuật toán 5 bước
@@ -246,7 +246,7 @@ class VideoRepository {
 
       final videos = snapshot.docs
           .map((doc) => VideoModel.fromMap(doc.data(), doc.id))
-          .where((v) => v.moderationStatus != 'rejected')
+          .where((v) => v.moderationStatus == 'approved')
           .toList();
 
       // Sắp xếp thủ công in-memory theo thời gian giảm dần (mới nhất lên đầu)

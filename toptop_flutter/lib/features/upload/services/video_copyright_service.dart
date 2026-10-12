@@ -33,7 +33,7 @@ class CopyrightEvaluation {
 class VideoCopyrightService {
   /// 1. Tính khoảng cách Hamming giữa 2 chuỗi Hex Hash (ví dụ pHash 64-bit)
   int computeHammingDistance(String hash1, String hash2) {
-    if (hash1.length != hash2.length) return 64; // Fallback
+    if (hash1.length != hash2.length || hash1.isEmpty) return 64; // Fallback
     
     int distance = 0;
     try {
@@ -60,13 +60,19 @@ class VideoCopyrightService {
     
     int totalDistance = 0;
     int framesToCompare = min(sourceHashes.length, targetHashes.length);
+    if (framesToCompare == 0) return 0.0;
     
     for (int i = 0; i < framesToCompare; i++) {
-      totalDistance += computeHammingDistance(sourceHashes[i], targetHashes[i]);
+      final sourceHash = sourceHashes[i];
+      final targetHash = targetHashes[i];
+      if (sourceHash.length != targetHash.length || sourceHash.isEmpty) {
+        return 0.0;
+      }
+      totalDistance += computeHammingDistance(sourceHash, targetHash);
     }
     
-    // Mỗi hash 64-bit -> tối đa 64 khoảng cách cho mỗi frame
-    int maxPossibleDistance = framesToCompare * 64;
+    // pHash chuẩn là 64-bit; dùng độ dài thực tế để test/mock hash vẫn đúng.
+    int maxPossibleDistance = framesToCompare * sourceHashes.first.length * 4;
     double similarity = 1.0 - (totalDistance / maxPossibleDistance);
     return max(0.0, similarity);
   }

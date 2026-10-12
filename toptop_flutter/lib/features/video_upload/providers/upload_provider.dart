@@ -118,9 +118,6 @@ class UploadNotifier extends StateNotifier<UploadState> {
         throw Exception(eval.message); // Chặn tải lên để tránh spam video trùng lặp
       }
 
-      // TODO: Nếu pendingReview, có thể đánh dấu trạng thái moderationStatus là 'pending'
-      // Hiện tại hàm saveVideoToFirestore đang hardcode 'approved', ta sẽ cần xử lý truyền tham số nếu cần
-
       // --- KIỂM DUYỆT AI & PHÂN LOẠI NÔNG NGHIỆP (NGƯỜI 1 & 3) ---
       // Gọi model mock để lấy metadata
       final aiMetadata = await _geminiService.mockAnalyzeVideo();
@@ -143,6 +140,8 @@ class UploadNotifier extends StateNotifier<UploadState> {
         allowDuet: allowDuet,
         isCopyrightProtected: isCopyrightProtected,
         keyframesPhash: newHashes,
+        moderationStatus: eval.decision == CopyrightDecision.pendingReview ? 'pending' : 'approved',
+        copyrightMatch: eval.decision == CopyrightDecision.pendingReview ? bestMatch : null,
       );
 
       // 3. Kết thúc thành công
