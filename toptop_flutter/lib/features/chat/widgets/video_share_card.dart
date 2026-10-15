@@ -11,7 +11,7 @@ import '../../../core/theme/app_theme.dart';
 /// Hỗ trợ Auto-play muted khi xuất hiện trong viewport.
 class VideoShareCard extends StatefulWidget {
   final String videoId;
-  final String? roomId; // Truyền roomId để hỗ trợ vuốt dọc danh sách video share
+  final String? roomId;
 
   const VideoShareCard({super.key, required this.videoId, this.roomId});
 
@@ -24,7 +24,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
   bool _isInitialized = false;
   bool _isMuted = true;
   String? _videoUrl;
-  bool _isUnavailable = false;
 
   @override
   void dispose() {
@@ -75,12 +74,10 @@ class _VideoShareCardState extends State<VideoShareCard> {
           .doc(widget.videoId)
           .get(),
       builder: (context, snapshot) {
-        // ── Loading ──────────────────────────────────────────────────────
         if (snapshot.connectionState == ConnectionState.waiting && !_isInitialized) {
           return _buildSkeleton(cardBg, borderColor);
         }
 
-        // ── Error / Not Found ─────────────────────────────────────────────
         final data = snapshot.data?.data();
         if (data == null && snapshot.connectionState == ConnectionState.done) {
           return _buildErrorCard(isDark, subColor);
@@ -135,7 +132,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ── Video / Thumbnail ────────────────────────────────────────────
                   ClipRRect(
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(14)),
@@ -144,7 +140,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          // Player or Thumbnail
                           _isInitialized
                               ? VideoPlayer(_controller!)
                               : (thumbnailUrl.isNotEmpty
@@ -154,7 +149,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
                                     )
                                   : Container(color: Colors.black12)),
 
-                          // Volume toggle icon
                           if (_isInitialized)
                             Positioned(
                               top: 8,
@@ -181,25 +175,26 @@ class _VideoShareCardState extends State<VideoShareCard> {
                               ),
                             ),
 
-                          // Play button overlay (if not playing)
+                          // Play button overlay (wrapped in IgnorePointer so tap passes to GestureDetector)
                           if (_isInitialized && !_controller!.value.isPlaying)
                             Center(
-                              child: Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.45),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Colors.white.withValues(alpha: 0.8),
-                                      width: 1.5),
+                              child: IgnorePointer(
+                                child: Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.45),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.8),
+                                        width: 1.5),
+                                  ),
+                                  child: const Icon(Icons.play_arrow_rounded,
+                                      color: Colors.white, size: 30),
                                 ),
-                                child: const Icon(Icons.play_arrow_rounded,
-                                    color: Colors.white, size: 30),
                               ),
                             ),
 
-                          // Gradient overlay từ dưới lên
                           Positioned(
                             left: 0,
                             right: 0,
@@ -219,7 +214,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
                             ),
                           ),
 
-                          // TopTop watermark
                           Positioned(
                             top: 8,
                             right: 8,
@@ -255,7 +249,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
                             ),
                           ),
 
-                          // View count ở góc dưới trái
                           Positioned(
                             left: 8,
                             bottom: 6,
@@ -278,13 +271,11 @@ class _VideoShareCardState extends State<VideoShareCard> {
                     ),
                   ),
 
-                  // ── Info section ─────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Description
                         Text(
                           description,
                           maxLines: 2,
@@ -298,7 +289,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
                         ),
                         const SizedBox(height: 6),
 
-                        // Author info
                         _AuthorRow(
                             authorId: authorId, isDark: isDark, subColor: subColor),
                       ],
@@ -364,7 +354,6 @@ class _VideoShareCardState extends State<VideoShareCard> {
   }
 }
 
-/// Row hiển thị avatar + username của tác giả video
 class _AuthorRow extends StatelessWidget {
   final String authorId;
   final bool isDark;
@@ -392,7 +381,6 @@ class _AuthorRow extends StatelessWidget {
 
         return Row(
           children: [
-            // Avatar
             SizedBox(
               width: 18,
               height: 18,
@@ -412,7 +400,6 @@ class _AuthorRow extends StatelessWidget {
             ),
             const SizedBox(width: 5),
 
-            // Username
             Expanded(
               child: Text(
                 username.isNotEmpty ? '@$username' : 'TopTop User',

@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../profile/providers/profile_provider.dart';
@@ -58,13 +59,10 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
 
     final commentId = DateTime.now().millisecondsSinceEpoch.toString();
     
-    // Xác định parentId và parentUsername nếu đang trả lời
     String parentId = '';
     String parentUsername = '';
 
     if (_replyingToComment != null) {
-      // Nếu comment được trả lời đã có parentId (tức là bản thân nó là một câu trả lời),
-      // thì gom nhóm tất cả dưới comment cha gốc cùng cấp
       if (_replyingToComment!.parentId.isNotEmpty) {
         parentId = _replyingToComment!.parentId;
       } else {
@@ -82,7 +80,6 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
       parentUsername: parentUsername,
     );
 
-    // Xóa text ngay để trải nghiệm mượt mà (optimistic)
     _commentController.clear();
     final repliedAuthorId = _replyingToComment?.authorId;
     _cancelReply();
@@ -117,15 +114,12 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
     final myUsername =
         userProfile?.username ?? currentUser.email?.split('@')[0] ?? '';
 
-    // Lắng nghe danh sách bình luận đã cấu trúc (phân cấp cây)
     final formattedComments = ref.watch(formattedCommentsProvider(widget.videoId));
     final commentsAsync = ref.watch(commentsStreamProvider(widget.videoId));
 
-    // Đếm tổng số bình luận thực tế
     final totalComments = commentsAsync.valueOrNull?.length ?? 0;
 
     return Padding(
-      // Rửa giao diện lên khi bàn phím xuất hiện
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
@@ -137,7 +131,6 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
         ),
         child: Column(
           children: [
-            // Thanh Handle kéo thả của BottomSheet
             const SizedBox(height: 10),
             Container(
               width: 36,
@@ -155,7 +148,7 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(width: 24), // Để căn giữa tiêu đề
+                  const SizedBox(width: 24),
                   Text(
                     '$totalComments bình luận',
                     style: const TextStyle(
@@ -202,7 +195,6 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
                       return CommentTile(
                         comment: comment,
                         onReplyTap: () {
-                          // Tìm tên người đăng để hiển thị
                           ref
                               .read(userProfileStreamProvider(comment.authorId)
                                   .future)
@@ -246,7 +238,6 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
               ),
             ),
 
-            // Ô soạn bình luận ở dưới cùng
             const Divider(color: Colors.white12, height: 1),
             
             // Preview đang phản hồi
@@ -285,7 +276,6 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
                 color: const Color(0xFF1D1D1F),
                 child: Row(
                   children: [
-                    // Avatar của tôi
                     CircleAvatar(
                       radius: 18,
                       backgroundColor: Colors.grey[800],
@@ -298,7 +288,7 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
                     ),
                     const SizedBox(width: 12),
 
-                    // Nhập nội dung
+                    // Ô nhập bình luận - Đảm bảo filled: false và cursorColor rõ nét
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
@@ -308,6 +298,7 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
                         child: TextField(
                           controller: _commentController,
                           focusNode: _focusNode,
+                          cursorColor: AppColors.primary,
                           style: const TextStyle(color: Colors.white, fontSize: 14),
                           decoration: InputDecoration(
                             hintText: _replyingToComment != null
@@ -322,13 +313,15 @@ class _CommentBottomSheetState extends ConsumerState<CommentBottomSheet> {
                               vertical: 10.0,
                             ),
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            filled: false, // Bắt buộc false để không bị ghi đè màu trắng từ Light ThemeData
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
 
-                    // Nút gửi
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _commentController,
                       builder: (context, value, child) {

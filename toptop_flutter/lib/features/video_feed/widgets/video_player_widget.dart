@@ -51,14 +51,12 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
   @override
   void initState() {
     super.initState();
-    // Nếu autoPlay=true, khởi tạo và phát ngay (dùng cho SingleVideoScreen)
     if (widget.autoPlay) {
       _isVisible = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _initController();
       });
     }
-    // Ngược lại, không khởi tạo ngay để tiết kiệm tài nguyên khi cuộn nhanh
   }
 
   void _initController() {
@@ -70,7 +68,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
     _controller!.initialize().then((_) {
       if (mounted) {
         _controller!.setLooping(true);
-        // Đồng bộ âm lượng ban đầu với mute state
         final isMuted = ref.read(videoMuteProvider);
         _controller!.setVolume(isMuted ? 0 : 1);
         
@@ -98,20 +95,17 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
     super.dispose();
   }
 
-  /// Ghi nhận lượt xem và sở thích (chỉ một lần duy nhất khi video bắt đầu được xem)
   void _trackWatch() {
     if (_hasLoggedWatch) return;
     _hasLoggedWatch = true;
 
     final repo = ref.read(videoRepositoryProvider);
 
-    // 1. Tăng watch count
     repo.incrementWatchCount(
       videoId: widget.video.videoId,
       authorId: widget.video.authorId,
     );
 
-    // 2. Tăng lượt xem cho chiến dịch quảng bá Đà Lạt nếu hợp lệ
     final isDalatCampaign = widget.video.location == 'Da Lat' ||
         widget.video.hashtags.any((tag) => const ['dalat', 'dalatdulich', 'khamphadalat']
             .contains(tag.toLowerCase().replaceAll('#', '')));
@@ -120,7 +114,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
     }
   }
 
-  /// Kiểm tra và ghi nhận xem lâu hoặc hoàn thành
   void _checkWatchProgress() {
     if (_controller == null || !mounted || !_isVisible) return;
 
@@ -129,15 +122,12 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
-    // 1. Xem trên 3 giây (Đánh dấu đã xem và ghi nhận thêm interest)
     if (_startTime != null) {
       final elapsed = DateTime.now().difference(_startTime!).inSeconds;
       if (elapsed >= 3) {
         final repo = ref.read(videoRepositoryProvider);
-        // Đánh dấu đã xem sau 3 giây để tránh ẩn video quá sớm nếu chỉ lướt qua
         repo.markVideoAsWatched(user.uid, widget.video.videoId);
 
-        // Ghi nhận hành vi xem >= 3s lên Colab RecSys Server
         repo.logRecSysInteraction(
           userId: user.uid,
           videoId: widget.video.videoId,
@@ -148,13 +138,12 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
         repo.recordInterest(
           tags: widget.video.hashtags,
           currentUid: user.uid,
-          weight: 1, // Cộng thêm 1 vào interest
+          weight: 1,
         );
-        _startTime = null; // Reset để không log lại mốc 3s
+        _startTime = null;
       }
     }
 
-    // 2. Xem gần hết (90%) - Ghi nhận thêm interest
     if (duration.inMilliseconds > 0 && !_hasLoggedComplete) {
       final progress = position.inMilliseconds / duration.inMilliseconds;
       if (progress >= 0.9) {
@@ -163,7 +152,7 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
         repo.recordInterest(
           tags: widget.video.hashtags,
           currentUid: user.uid,
-          weight: 2, // Cộng thêm interest vì xem hết
+          weight: 2,
         );
       }
     }
@@ -181,10 +170,8 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
   }
 
   void _handleDoubleTap(Offset localPosition) {
-    // Rung xúc giác khi double tap thả tim
     HapticFeedback.mediumImpact();
 
-    // 1. Thêm trái tim bay
     final randomAngle = (math.Random().nextDouble() * 40 - 20) * math.pi / 180;
     final newHeart = FloatingHeart(
       key: UniqueKey(),
@@ -196,7 +183,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
       _hearts.add(newHeart);
     });
 
-    // Xóa trái tim sau khi kết thúc hoạt ảnh (700ms)
     Future.delayed(const Duration(milliseconds: 700), () {
       if (mounted) {
         setState(() {
@@ -205,7 +191,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
       }
     });
 
-    // 2. Tự động thích nếu chưa thích
     _likeVideoIfNotAlready();
   }
 
@@ -232,7 +217,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
 
   @override
   Widget build(BuildContext context) {
-    // Lắng nghe trạng thái tắt âm toàn cục
     final isMuted = ref.watch(videoMuteProvider);
     if (_controller != null && _controller!.value.isInitialized) {
       _controller!.setVolume(isMuted ? 0 : 1);
@@ -245,7 +229,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
       onVisibilityChanged: (info) {
         if (!mounted) return;
 
-        // Bỏ qua VisibilityDetector nếu đang ở chế độ autoPlay (SingleVideoScreen)
         if (widget.autoPlay) return;
 
         final visible = info.visibleFraction > 0.5;
@@ -267,7 +250,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
           }
         }
 
-        // Tối ưu giải phóng RAM: Khi video hoàn toàn khuất màn hình
         if (info.visibleFraction == 0.0) {
           _disposeController();
         }
@@ -296,20 +278,27 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
                   ),
           ),
 
-          // Hiển thị icon Pause ở giữa màn hình nếu đang tạm dừng thủ công
+          // Hiển thị icon Pause/Play ở giữa màn hình nếu đang tạm dừng thủ công
+          // Dùng IgnorePointer để sự kiện chạm xuyên trực tiếp xuống GestureDetector phía dưới
           if (hasController && !_controller!.value.isPlaying)
             Align(
               alignment: Alignment.center,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Colors.black45,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_arrow,
-                  size: 50,
-                  color: Colors.white,
+              child: IgnorePointer(
+                child: Semantics(
+                  label: 'Phát video',
+                  button: true,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Colors.black45,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      size: 50,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -351,9 +340,6 @@ class _VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget>
                   duration: const Duration(milliseconds: 700),
                   tween: Tween<double>(begin: 0.0, end: 1.0),
                   builder: (context, value, child) {
-                    // value chạy từ 0.0 -> 1.0
-                    // 0.0 -> 0.3: Scale up và Fade in
-                    // 0.3 -> 1.0: Fly up, Rotate và Fade out
                     double scale = 1.0;
                     double opacity = 1.0;
                     double translateUp = 0.0;

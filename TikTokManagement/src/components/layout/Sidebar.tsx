@@ -2,6 +2,8 @@ import {
   LayoutDashboard,
   Users,
   ShieldCheck,
+  Store,
+  ShoppingBag,
   BarChart,
   Megaphone,
   Settings,
@@ -26,7 +28,9 @@ export function Sidebar({ currentTab, onTabChange, mobileOpen, onMobileClose }: 
   const tabs = [
     { id: 'dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'users', label: 'Người dùng', icon: Users },
-    { id: 'moderation', label: 'Kiểm duyệt', icon: ShieldCheck, roles: ['admin', 'moderator'] },
+    { id: 'moderation', label: 'Kiểm duyệt Video', icon: ShieldCheck, roles: ['admin', 'moderator'] },
+    { id: 'stores', label: 'Kiểm duyệt Gian hàng', icon: Store, roles: ['admin', 'moderator'] },
+    { id: 'products', label: 'Kiểm duyệt Sản phẩm', icon: ShoppingBag, roles: ['admin', 'moderator'] },
     { id: 'reports', label: 'Báo cáo', icon: BarChart },
     { id: 'ads', label: 'Quảng cáo', icon: Megaphone, roles: ['admin'] },
     { id: 'settings', label: 'Cài đặt', icon: Settings, roles: ['admin'] },
@@ -55,10 +59,10 @@ export function Sidebar({ currentTab, onTabChange, mobileOpen, onMobileClose }: 
           <div className="flex items-center justify-between px-4 mb-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0">
-                <img src={logoImg} alt="TopTop Logo" className="w-full h-full object-cover" />
+                <img src={logoImg} alt="Nông Video Logo" className="w-full h-full object-cover" />
               </div>
               <div>
-                <h1 className="font-headline text-2xl font-bold text-primary">TopTop</h1>
+                <h1 className="font-headline text-2xl font-bold text-primary">Nông Video</h1>
                 <p className="font-label text-xs text-on-surface-variant">Hệ thống quản trị</p>
               </div>
             </div>

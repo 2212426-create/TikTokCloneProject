@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/text_utils.dart';
 import '../../../core/utils/time_utils.dart';
 import '../../profile/providers/profile_provider.dart';
 import '../models/video_model.dart';
 import '../providers/video_provider.dart';
+import '../../products/widgets/product_bottom_sheet.dart';
 
-/// Widget hiển thị thông tin đè lên Video (Tên tác giả, mô tả, hashtag, nhạc)
-/// Port từ VideoAdapter.VideoViewHolder.updateMetadataUI() — Premium upgrade
+/// Widget hiển thị thông tin nông nghiệp đè lên Video
 class VideoOverlay extends ConsumerStatefulWidget {
   final VideoModel video;
   final VoidCallback? onCampaignBadgeTap;
@@ -41,12 +43,6 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
     super.dispose();
   }
 
-  bool get _isDalatCampaign {
-    return widget.video.location == 'Da Lat' ||
-        widget.video.hashtags.any((tag) => const ['dalat', 'dalatdulich', 'khamphadalat']
-            .contains(tag.toLowerCase().replaceAll('#', '')));
-  }
-
   @override
   Widget build(BuildContext context) {
     final authorProfile = ref.watch(userProfileStreamProvider(widget.video.authorId)).valueOrNull;
@@ -57,17 +53,16 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
       bottom: 0,
       right: 0,
       child: Container(
-        // Gradient overlay phía dưới
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             colors: [
-              Colors.black87,
+              Color(0xE6000000),
               Colors.black54,
               Colors.transparent,
             ],
-            stops: [0.0, 0.4, 1.0],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         padding: const EdgeInsets.only(left: 16, right: 90, bottom: 20, top: 60),
@@ -75,50 +70,106 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Thẻ Chiến dịch Đà Lạt
-            if (_isDalatCampaign) ...[
+            // 1. Thẻ sản phẩm gắn kèm video
+            if (widget.video.taggedProductIds.isNotEmpty) ...[
               GestureDetector(
-                onTap: widget.onCampaignBadgeTap,
+                onTap: () {
+                  final productId = widget.video.taggedProductIds.first;
+                  ProductBottomSheet.show(context, productId: productId);
+                },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFFE2C55), Color(0xFF8B2C4E)],
+                      colors: [AppColors.secondary, Color(0xFFFFA000)],
                     ),
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
                       BoxShadow(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                        blurRadius: 8,
+                        color: Colors.black26,
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Row(
-                     mainAxisSize: MainAxisSize.min,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('🌲', style: TextStyle(fontSize: 12)),
-                      SizedBox(width: 4),
+                      const Icon(Icons.shopping_bag_outlined, size: 14, color: Colors.black87),
+                      const SizedBox(width: 4),
                       Text(
-                        'Du Lịch Đà Lạt',
+                        'Xem sản phẩm (${widget.video.taggedProductIds.length})',
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right, size: 14, color: Colors.black87),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+
+            // 2. Thẻ Nhật ký mùa vụ liên quan
+            if (widget.video.relatedJournalId != null && widget.video.relatedJournalId!.isNotEmpty) ...[
+              GestureDetector(
+                onTap: () {
+                  context.push('/journal/${widget.video.relatedJournalId}');
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(200),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white30, width: 0.5),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.menu_book, size: 13, color: Colors.white),
+                      SizedBox(width: 5),
+                      Text(
+                        'Xem nhật ký liên quan',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
             ],
 
-            // Tên tác giả và thời gian (nếu ở tab Following)
+            // 3. Các thẻ nông nghiệp (Cây trồng, Giai đoạn, Khu vực, Chủ đề)
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (widget.video.crop != null && widget.video.crop!.isNotEmpty)
+                  _buildTagBadge('🌱 ${widget.video.crop}', AppColors.primary),
+                if (widget.video.growthStage != null && widget.video.growthStage!.isNotEmpty)
+                  _buildTagBadge('🌸 ${widget.video.growthStage}', AppColors.accentBrown),
+                if (widget.video.region != null && widget.video.region!.isNotEmpty)
+                  _buildTagBadge('📍 ${widget.video.region}', Colors.blueGrey),
+                if (widget.video.technicalTopic != null && widget.video.technicalTopic!.isNotEmpty)
+                  _buildTagBadge('🔬 ${widget.video.technicalTopic}', Colors.teal),
+              ],
+            ),
+            if (widget.video.crop != null || widget.video.growthStage != null || widget.video.region != null)
+              const SizedBox(height: 8),
+
+            // 4. Tên tác giả & Thời gian
             Row(
               children: [
                 Text(
-                  username.isNotEmpty ? '@$username' : '@User',
+                  username.isNotEmpty ? '@$username' : '@NhaVuon',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -134,7 +185,7 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
                   Text(
                     '• ${TimeUtils.formatRelativeTime(widget.video.timestamp)}',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.white.withAlpha(160),
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -144,7 +195,7 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
             ),
             const SizedBox(height: 8),
 
-            // Mô tả video
+            // 5. Mô tả video
             if (widget.video.description.isNotEmpty)
               Text(
                 widget.video.description,
@@ -160,7 +211,7 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
                 overflow: TextOverflow.ellipsis,
               ),
 
-            // Hashtag pills
+            // 6. Hashtags (Chạm mở Màn hình Hashtag tập trung)
             if (widget.video.hashtags.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
@@ -170,21 +221,28 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
                     .map((tag) => tag.trim())
                     .where((tag) => tag.isNotEmpty)
                     .map((tag) => tag.startsWith('#') ? tag.substring(1) : tag)
-                    .toSet() // Loại bỏ trùng lặp
+                    .toSet()
                     .take(5)
                     .map((tag) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '#$tag',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                  final cleanTag = TextUtils.normalizeHashtag(tag);
+
+                  return GestureDetector(
+                    onTap: () {
+                      context.push('/hashtag/$cleanTag');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(40),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '#$tag',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                   );
@@ -192,11 +250,11 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
               ),
             ],
 
-            // Music marquee row
+            // 7. Nhạc marquee
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.music_note, color: Colors.white, size: 14),
+                const Icon(Icons.agriculture, color: Colors.white, size: 14),
                 const SizedBox(width: 6),
                 Expanded(
                   child: SizedBox(
@@ -209,9 +267,9 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
                             child: FractionalTranslation(
                               translation: Offset(1.0 - 2.0 * _marqueeController.value, 0),
                               child: Text(
-                                '♪ Nhạc gốc — ${username.isNotEmpty ? username : "TopTop"} • Đang phát',
+                                '♪ Kỹ thuật nông nghiệp — ${username.isNotEmpty ? username : "Nông Video"}',
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.8),
+                                  color: Colors.white.withAlpha(200),
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -229,6 +287,24 @@ class _VideoOverlayState extends ConsumerState<VideoOverlay>
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTagBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withAlpha(200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

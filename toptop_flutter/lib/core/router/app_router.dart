@@ -8,6 +8,7 @@ import 'package:toptop_flutter/features/auth/layouts/auth_choice_screen.dart';
 import 'package:toptop_flutter/features/auth/layouts/login_screen.dart';
 import 'package:toptop_flutter/features/auth/layouts/signup_screen.dart';
 import 'package:toptop_flutter/features/auth/layouts/splash_screen.dart';
+import 'package:toptop_flutter/features/cart/layouts/cart_screen.dart';
 import 'package:toptop_flutter/features/chat/layouts/inbox_screen.dart';
 import 'package:toptop_flutter/features/chat/layouts/chat_screen.dart';
 import 'package:toptop_flutter/features/chat/layouts/group_chat_screen.dart';
@@ -15,24 +16,43 @@ import 'package:toptop_flutter/features/chat/layouts/group_settings_screen.dart'
 import 'package:toptop_flutter/features/chat/layouts/group_management_screen.dart';
 import 'package:toptop_flutter/features/chat/layouts/notifications_screen.dart';
 import 'package:toptop_flutter/features/chat/layouts/shared_video_player_screen.dart';
+import 'package:toptop_flutter/features/farm_journal/layouts/create_journal_entry_screen.dart';
+import 'package:toptop_flutter/features/farm_journal/layouts/create_journal_screen.dart';
+import 'package:toptop_flutter/features/farm_journal/layouts/journal_detail_screen.dart';
+import 'package:toptop_flutter/features/hashtags/layouts/hashtag_screen.dart';
+import 'package:toptop_flutter/features/near_me/layouts/near_me_screen.dart';
+import 'package:toptop_flutter/features/orders/layouts/checkout_screen.dart';
+import 'package:toptop_flutter/features/orders/layouts/order_detail_screen.dart';
+import 'package:toptop_flutter/features/orders/layouts/orders_screen.dart';
+import 'package:toptop_flutter/features/products/layouts/edit_product_screen.dart';
+import 'package:toptop_flutter/features/products/layouts/marketplace_screen.dart';
+import 'package:toptop_flutter/features/products/layouts/product_detail_screen.dart';
 import 'package:toptop_flutter/features/profile/layouts/profile_screen.dart';
 import 'package:toptop_flutter/features/profile/layouts/edit_profile_screen.dart';
 import 'package:toptop_flutter/features/profile/layouts/edit_field_screen.dart';
 import 'package:toptop_flutter/features/profile/layouts/follow_list_screen.dart';
+import 'package:toptop_flutter/features/quote_requests/layouts/quote_requests_screen.dart';
+import 'package:toptop_flutter/features/saved_techniques/layouts/saved_techniques_screen.dart';
 import 'package:toptop_flutter/features/settings/layouts/settings_screen.dart';
 import 'package:toptop_flutter/features/settings/layouts/account_settings_screen.dart';
 import 'package:toptop_flutter/features/settings/layouts/change_password_screen.dart';
 import 'package:toptop_flutter/features/settings/layouts/delete_account_screen.dart';
 import 'package:toptop_flutter/features/settings/layouts/appearance_screen.dart';
 import 'package:toptop_flutter/features/search/layouts/search_screen.dart';
+import 'package:toptop_flutter/features/store/layouts/public_store_screen.dart';
+import 'package:toptop_flutter/features/store/layouts/seller_orders_screen.dart';
+import 'package:toptop_flutter/features/store/layouts/seller_overview_screen.dart';
+import 'package:toptop_flutter/features/store/layouts/seller_products_screen.dart';
+import 'package:toptop_flutter/features/store/layouts/seller_store_settings_screen.dart';
+import 'package:toptop_flutter/features/store/layouts/store_registration_screen.dart';
 import 'package:toptop_flutter/features/video_feed/layouts/video_feed_screen.dart';
 import 'package:toptop_flutter/features/video_feed/layouts/single_video_screen.dart';
 import 'package:toptop_flutter/features/video_upload/layouts/camera_screen.dart';
 import 'package:toptop_flutter/features/video_upload/layouts/video_description_screen.dart';
 import 'package:toptop_flutter/shared/widgets/bottom_nav_shell.dart';
+import 'package:toptop_flutter/shared/widgets/seller_bottom_nav_shell.dart';
 
-/// Cấu hình GoRouter cho toàn bộ ứng dụng
-/// Bao gồm redirect logic kiểm tra auth state
+/// Cấu hình GoRouter đa chế độ (Normal Buyer Shell vs Seller Workspace Shell)
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
 
@@ -45,13 +65,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       child: child,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return SlideTransition(
-          position:
-              Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-              ),
+          position: Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+          ),
           child: child,
         );
       },
@@ -59,38 +78,36 @@ final routerProvider = Provider<GoRouter>((ref) {
   }
 
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/home',
     debugLogDiagnostics: true,
 
-    // Redirect logic: kiểm tra đăng nhập
     redirect: (context, state) {
       final isLoggedIn = authState.valueOrNull != null;
       final isLoading = authState.isLoading;
       final currentPath = state.uri.path;
 
-      // Đang tải auth state → không redirect
       if (isLoading) return null;
-
-      // Splash screen → xử lý riêng
       if (currentPath == '/') return null;
 
-      // Nếu chưa đăng nhập và đang ở trang cần auth
       final isAuthRoute = currentPath.startsWith('/auth');
 
-      // Danh sách các route được phép truy cập khi chưa đăng nhập (Khách)
       final isAllowedGuestRoute =
           isAuthRoute ||
           currentPath == '/home' ||
+          currentPath == '/near-me' ||
+          currentPath == '/marketplace' ||
           currentPath == '/search' ||
+          currentPath.startsWith('/hashtag/') ||
+          currentPath.startsWith('/store/') ||
+          currentPath.startsWith('/marketplace/products/') ||
+          currentPath.startsWith('/journal/') ||
           currentPath.startsWith('/video/') ||
-          currentPath.startsWith('/user/') ||
-          currentPath.startsWith('/groupchat/');
+          currentPath.startsWith('/user/');
 
       if (!isLoggedIn && !isAllowedGuestRoute) {
         return '/auth';
       }
 
-      // Nếu đã đăng nhập và đang ở trang auth → về home
       if (isLoggedIn && isAuthRoute) {
         return '/home';
       }
@@ -99,10 +116,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
-      // Splash Screen
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
 
-      // Auth Routes
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthChoiceScreen(),
@@ -118,13 +133,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Main App Shell (Bottom Navigation)
+      // 1. Normal Mode Bottom Navigation Shell
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return BottomNavShell(navigationShell: navigationShell);
         },
         branches: [
-          // Tab 0: Home (Video Feed)
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -133,32 +147,26 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-
-          // Tab 1: Search
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/search',
-                builder: (context, state) => const SearchScreen(),
+                path: '/near-me',
+                builder: (context, state) => const NearMeScreen(),
               ),
             ],
           ),
-
-          // Tab 2: Inbox
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/inbox',
-                builder: (context, state) => const InboxScreen(),
+                path: '/marketplace',
+                builder: (context, state) => const MarketplaceScreen(),
               ),
             ],
           ),
-
-          // Tab 3: Profile
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/profile',
+                path: '/my-farm',
                 builder: (context, state) => const ProfileScreen(),
               ),
             ],
@@ -166,27 +174,185 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Camera (bên ngoài shell — fullscreen)
+      // 2. Seller Mode Bottom Navigation Shell
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return SellerBottomNavShell(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/seller/overview',
+                builder: (context, state) => const SellerOverviewScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/seller/products',
+                builder: (context, state) => const SellerProductsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/seller/orders',
+                builder: (context, state) => const SellerOrdersScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/seller/messages',
+                builder: (context, state) => const InboxScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/seller/store',
+                builder: (context, state) => const SellerStoreSettingsScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // Fullscreen App Routes
+      GoRoute(
+        path: '/hashtag/:tag',
+        builder: (context, state) {
+          final tag = state.pathParameters['tag'] ?? '';
+          return HashtagScreen(tag: tag);
+        },
+      ),
+
+      GoRoute(
+        path: '/store/register',
+        builder: (context, state) => const StoreRegistrationScreen(),
+      ),
+
+      GoRoute(
+        path: '/store/:storeId',
+        builder: (context, state) {
+          final sId = state.pathParameters['storeId'] ?? '';
+          return PublicStoreScreen(storeId: sId);
+        },
+      ),
+
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchScreen(),
+      ),
+
+      GoRoute(
+        path: '/inbox',
+        builder: (context, state) => const InboxScreen(),
+      ),
+
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+
+      GoRoute(
+        path: '/saved-techniques',
+        builder: (context, state) => const SavedTechniquesScreen(),
+      ),
+
+      GoRoute(
+        path: '/journal/create',
+        builder: (context, state) => const CreateJournalScreen(),
+      ),
+
+      GoRoute(
+        path: '/journal/:journalId',
+        builder: (context, state) {
+          final jId = state.pathParameters['journalId'] ?? '';
+          return JournalDetailScreen(journalId: jId);
+        },
+      ),
+
+      GoRoute(
+        path: '/journal/:journalId/entry/create',
+        builder: (context, state) {
+          final jId = state.pathParameters['journalId'] ?? '';
+          return CreateJournalEntryScreen(journalId: jId);
+        },
+      ),
+
+      GoRoute(
+        path: '/marketplace/products/create',
+        builder: (context, state) => const EditProductScreen(),
+      ),
+
+      GoRoute(
+        path: '/marketplace/products/edit/:productId',
+        builder: (context, state) {
+          final pId = state.pathParameters['productId'] ?? '';
+          return EditProductScreen(productId: pId);
+        },
+      ),
+
+      GoRoute(
+        path: '/marketplace/products/:productId',
+        builder: (context, state) {
+          final pId = state.pathParameters['productId'] ?? '';
+          return ProductDetailScreen(productId: pId);
+        },
+      ),
+
+      GoRoute(
+        path: '/cart',
+        builder: (context, state) => const CartScreen(),
+      ),
+
+      GoRoute(
+        path: '/checkout',
+        builder: (context, state) => const CheckoutScreen(),
+      ),
+
+      GoRoute(
+        path: '/orders',
+        builder: (context, state) => const OrdersScreen(),
+      ),
+
+      GoRoute(
+        path: '/orders/:orderId',
+        builder: (context, state) {
+          final oId = state.pathParameters['orderId'] ?? '';
+          return OrderDetailScreen(orderId: oId);
+        },
+      ),
+
+      GoRoute(
+        path: '/quote-requests',
+        builder: (context, state) => const QuoteRequestsScreen(),
+      ),
+
       GoRoute(
         path: '/camera',
         pageBuilder: (context, state) => CustomTransitionPage(
           child: const CameraScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return SlideTransition(
-              position:
-                  Tween<Offset>(
-                    begin: const Offset(1.0, 0.0),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-                  ),
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+              ),
               child: child,
             );
           },
         ),
       ),
 
-      // Thêm mô tả & Đăng video (bên ngoài shell — fullscreen)
       GoRoute(
         path: '/video/description',
         builder: (context, state) {
@@ -198,13 +364,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Chi tiết Video (bên ngoài shell — fullscreen)
       GoRoute(
         path: '/video/:videoId',
         builder: (context, state) {
           final videoId = state.pathParameters['videoId'] ?? '';
-          final showComments =
-              state.uri.queryParameters['showComments'] == 'true';
+          final showComments = state.uri.queryParameters['showComments'] == 'true';
           return SingleVideoScreen(
             videoId: videoId,
             showComments: showComments,
@@ -212,7 +376,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Profile người khác (bên ngoài shell — fullscreen)
       GoRoute(
         path: '/user/:userId',
         pageBuilder: (context, state) {
@@ -224,7 +387,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Followers list
       GoRoute(
         path: '/user/:userId/followers',
         pageBuilder: (context, state) {
@@ -236,7 +398,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Following list
       GoRoute(
         path: '/user/:userId/following',
         pageBuilder: (context, state) {
@@ -248,7 +409,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Edit profile
       GoRoute(
         path: '/profile/edit',
         pageBuilder: (context, state) => buildSlidePage(
@@ -257,7 +417,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // Edit field
       GoRoute(
         path: '/profile/edit/:field',
         pageBuilder: (context, state) {
@@ -269,7 +428,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Màn hình chat chi tiết
       GoRoute(
         path: '/chat/:receiverId',
         pageBuilder: (context, state) {
@@ -287,7 +445,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Màn hình chat nhóm
       GoRoute(
         path: '/groupchat/:groupId',
         pageBuilder: (context, state) {
@@ -303,7 +460,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Màn hình cài đặt nhóm
       GoRoute(
         path: '/group-settings/:groupId',
         pageBuilder: (context, state) {
@@ -315,7 +471,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Màn hình quản lý nhóm (admin)
       GoRoute(
         path: '/group-management/:groupId',
         pageBuilder: (context, state) {
@@ -327,7 +482,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Màn hình tất cả thông báo hoạt động
       GoRoute(
         path: '/notifications',
         pageBuilder: (context, state) => buildSlidePage(
@@ -336,7 +490,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // Màn hình xem video từ share
       GoRoute(
         path: '/shared-videos/:roomId',
         builder: (context, state) {
@@ -349,11 +502,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Các màn hình Cài đặt & Quyền riêng tư
       GoRoute(
         path: '/settings',
-        pageBuilder: (context, state) =>
-            buildSlidePage(key: state.pageKey, child: const SettingsScreen()),
+        pageBuilder: (context, state) => buildSlidePage(
+          key: state.pageKey,
+          child: const SettingsScreen(),
+        ),
         routes: [
           GoRoute(
             path: 'account',
@@ -387,19 +541,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
 
-    // Error page
     errorBuilder: (context, state) => Scaffold(
-      backgroundColor: const Color(0xFF121212),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text(
-              'Không tìm thấy trang: ${state.uri.path}',
-              style: const TextStyle(color: Colors.white),
-            ),
+            Text('Không tìm thấy trang: ${state.uri.path}'),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => context.go('/home'),

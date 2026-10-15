@@ -3,10 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
-/// Shell widget cho 5 tab chính, bám theo thanh điều hướng Android gốc.
+/// Shell widget cho 5 tab chính của Nông Video (Giao diện Thông Thường):
+/// 1. Trang chủ (Feed video kỹ thuật)
+/// 2. Quanh đây (Địa điểm, nhà vườn, thời tiết)
+/// 3. Nút + ở giữa (Đăng video / Thêm nhật ký)
+/// 4. Chợ (Sản phẩm & giỏ hàng)
+/// 5. Cá nhân (Hồ sơ, nhật ký, đơn mua, báo giá đã gửi, trạng thái gian hàng)
 class BottomNavShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
@@ -15,20 +20,30 @@ class BottomNavShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
-    // Map UI index (0-4) → branch index (0-3, bỏ qua Add button ở giữa)
     final currentBranch = navigationShell.currentIndex;
-    // Tính UI index từ branch index
     final uiIndex = currentBranch >= 2 ? currentBranch + 1 : currentBranch;
 
     return Scaffold(
       body: navigationShell,
       extendBody: false,
       bottomNavigationBar: Container(
-        color: Colors.black,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkBg
+            : AppColors.lightBg,
         child: SafeArea(
           top: false,
-          child: SizedBox(
+          child: Container(
             height: 60,
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.darkBorder
+                      : AppColors.lightBorder,
+                  width: 0.5,
+                ),
+              ),
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -42,39 +57,37 @@ class BottomNavShell extends ConsumerWidget {
                 ),
                 Expanded(
                   child: _NavItem(
-                    icon: Icons.search,
-                    activeIcon: Icons.search,
-                    label: 'Khám phá',
+                    icon: Icons.near_me_outlined,
+                    activeIcon: Icons.near_me,
+                    label: 'Quanh đây',
                     isActive: uiIndex == 1,
                     onTap: () => _onTap(context, ref, 1),
                   ),
                 ),
                 Expanded(
                   child: Center(
-                    child: _AddVideoButton(
+                    child: _AddButton(
                       onTap: () {
                         HapticFeedback.lightImpact();
                         if (currentUser == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text(
-                                'Vui lòng đăng nhập để đăng video!',
-                              ),
+                              content: Text('Vui lòng đăng nhập để tạo nội dung!'),
                             ),
                           );
                           context.go('/auth');
                           return;
                         }
-                        context.push('/camera');
+                        _showCreateOptionsSheet(context);
                       },
                     ),
                   ),
                 ),
                 Expanded(
                   child: _NavItem(
-                    icon: Icons.inbox_outlined,
-                    activeIcon: Icons.inbox,
-                    label: 'Hộp thư',
+                    icon: Icons.storefront_outlined,
+                    activeIcon: Icons.storefront,
+                    label: 'Chợ',
                     isActive: uiIndex == 3,
                     onTap: () => _onTap(context, ref, 3),
                   ),
@@ -83,7 +96,7 @@ class BottomNavShell extends ConsumerWidget {
                   child: _NavItem(
                     icon: Icons.person_outline,
                     activeIcon: Icons.person,
-                    label: 'Hồ sơ',
+                    label: 'Cá nhân',
                     isActive: uiIndex == 4,
                     onTap: () => _onTap(context, ref, 4),
                   ),
@@ -97,22 +110,18 @@ class BottomNavShell extends ConsumerWidget {
   }
 
   void _onTap(BuildContext context, WidgetRef ref, int uiIndex) {
-    // Index 2 = nút Add Video → đã xử lý riêng
     if (uiIndex == 2) return;
 
     final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null && (uiIndex == 3 || uiIndex == 4)) {
-      final tabName = uiIndex == 3 ? 'hộp thư' : 'hồ sơ';
+    if (currentUser == null && uiIndex == 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Vui lòng đăng nhập để truy cập $tabName!')),
+        const SnackBar(content: Text('Vui lòng đăng nhập để truy cập trang Cá nhân!')),
       );
       context.go('/auth');
       return;
     }
 
     final branchIndex = uiIndex > 2 ? uiIndex - 1 : uiIndex;
-
-    // Rung xúc giác khi chuyển tab
     HapticFeedback.selectionClick();
 
     navigationShell.goBranch(
@@ -120,9 +129,72 @@ class BottomNavShell extends ConsumerWidget {
       initialLocation: branchIndex == navigationShell.currentIndex,
     );
   }
+
+  void _showCreateOptionsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tạo nội dung mới',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(30),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.videocam, color: AppColors.primary),
+                ),
+                title: const Text('Đăng video kỹ thuật', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Chia sẻ kinh nghiệm canh tác, mẹo nông nghiệp'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/camera');
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withAlpha(50),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.menu_book, color: AppColors.accentBrown),
+                ),
+                title: const Text('Thêm nhật ký mùa vụ', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Ghi chép tiến trình, nhật ký cây trồng, vườn lô'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push('/journal/create');
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
-/// Tab item với active dot indicator
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final IconData activeIcon;
@@ -140,6 +212,10 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeColor = AppColors.primary;
+    final inactiveColor = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -149,12 +225,16 @@ class _NavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(isActive ? activeIcon : icon, color: Colors.white, size: 24),
+            Icon(
+              isActive ? activeIcon : icon,
+              color: isActive ? activeColor : inactiveColor,
+              size: 24,
+            ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                color: Colors.white,
+                color: isActive ? activeColor : inactiveColor,
                 fontSize: 10,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -166,56 +246,33 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-/// Faithful Flutter equivalent of Android's layered cyan/white/red add button.
-class _AddVideoButton extends StatelessWidget {
+class _AddButton extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _AddVideoButton({required this.onTap});
+  const _AddButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Đăng video',
+      label: 'Đăng nội dung',
       child: GestureDetector(
         onTap: onTap,
-        child: SizedBox(
-          width: 45,
-          height: 30,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                left: 0,
-                right: 4,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppTheme.secondaryColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                left: 4,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                left: 4,
-                right: 4,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.add, color: Colors.black, size: 20),
-                ),
+        child: Container(
+          width: 44,
+          height: 32,
+          decoration: BoxDecoration(
+            gradient: AppColors.brandGradient,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withAlpha(80),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
+          child: const Icon(Icons.add, color: Colors.white, size: 22),
         ),
       ),
     );

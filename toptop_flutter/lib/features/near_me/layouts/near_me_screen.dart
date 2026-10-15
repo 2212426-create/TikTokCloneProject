@@ -1,0 +1,199 @@
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../products/repositories/product_repository.dart';
+import '../widgets/weather_widget.dart';
+
+/// Màn hình "Quanh Đây" - Tìm kiếm nhà vườn, nông sản và video kỹ thuật theo bán kính
+class NearMeScreen extends ConsumerStatefulWidget {
+  const NearMeScreen({super.key});
+
+  @override
+  ConsumerState<NearMeScreen> createState() => _NearMeScreenState();
+}
+
+class _NearMeScreenState extends ConsumerState<NearMeScreen> {
+  int _selectedRadius = 20; // km: 10, 20, 50
+  String _manualRegion = 'Lâm Đồng';
+  bool _useGps = false;
+
+  final double _currentLat = 11.7381;
+  final double _currentLng = 108.3752;
+
+  final List<String> _regions = [
+    'Lâm Đồng',
+    'Đắc Lắk',
+    'Gia Lai',
+    'Đồng Nai',
+    'Cần Thơ',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final productsAsync = ref.watch(marketplaceProductsStreamProvider((
+      category: null,
+      region: _manualRegion,
+      saleType: null,
+      query: null,
+    )));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Nông Nghiệp Quanh Đây'),
+      ),
+      body: Column(
+        children: [
+          WeatherWidget(region: _manualRegion),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, color: AppColors.primary, size: 18),
+                    const SizedBox(width: 4),
+                    const Text('Khu vực:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 6),
+
+                    DropdownButton<String>(
+                      value: _manualRegion,
+                      underline: const SizedBox.shrink(),
+                      isDense: true,
+                      items: _regions.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 13)))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _manualRegion = val);
+                      },
+                    ),
+                    const Spacer(),
+
+                    FilterChip(
+                      label: Text(_useGps ? 'GPS On' : 'Chọn tay', style: const TextStyle(fontSize: 11)),
+                      selected: _useGps,
+                      selectedColor: AppColors.primary,
+                      visualDensity: VisualDensity.compact,
+                      onSelected: (selected) {
+                        setState(() => _useGps = selected);
+                        if (selected) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Đã định vị tọa độ Đức Trọng, Lâm Đồng!')),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                Row(
+                  children: [
+                    const Text('Bán kính:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [10, 20, 50].map((radius) {
+                            final isSelected = _selectedRadius == radius;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: ChoiceChip(
+                                label: Text('${radius}km', style: const TextStyle(fontSize: 11)),
+                                selected: isSelected,
+                                selectedColor: AppColors.primary,
+                                visualDensity: VisualDensity.compact,
+                                onSelected: (selected) {
+                                  if (selected) setState(() => _selectedRadius = radius);
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: productsAsync.when(
+              data: (products) {
+                if (products.isEmpty) {
+                  return const Center(child: Text('Không có nhà vườn nào trong bán kính chọn.'));
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: products.length,
+                  separatorBuilder: (context, index) => const Divider(height: 12),
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    final distanceKm = _calculateDistanceKm(_currentLat, _currentLng, 11.75 + (index * 0.02), 108.38 + (index * 0.02));
+
+                    return Card(
+                      child: ListTile(
+                        leading: Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withAlpha(20),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: product.images.isNotEmpty
+                              ? Image.network(product.images.first, fit: BoxFit.cover)
+                              : const Icon(Icons.grass, color: AppColors.primary),
+                        ),
+                        title: Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 2),
+                            Text('Nhà vườn: ${product.sellerName.isNotEmpty ? product.sellerName : "Nông hộ"}', style: const TextStyle(fontSize: 11)),
+                            Row(
+                              children: [
+                                Icon(Icons.near_me, size: 12, color: Colors.grey.shade600),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'Cách ~${distanceKm.toStringAsFixed(1)} km • Xe tải 5T tận nơi',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        trailing: const Icon(Icons.chevron_right, size: 20),
+                        onTap: () {
+                          context.push('/marketplace/products/${product.id}');
+                        },
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(child: Text('Lỗi: $err')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+    const p = 0.017453292519943295;
+    final a = 0.5 - math.cos((lat2 - lat1) * p) / 2 + math.cos(lat1 * p) * math.cos(lat2 * p) * (1 - math.cos((lon2 - lon1) * p)) / 2;
+    return 12742 * math.asin(math.sqrt(a));
+  }
+}
