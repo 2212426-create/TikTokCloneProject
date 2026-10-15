@@ -35,4 +35,16 @@ class GeminiService {
     final response = await _model.generateContent(content);
     return response.text ?? '';
   }
+
+  /// MOCK AI (Dành cho Thành viên 1 / 3): Giả lập AI phân tích video
+  /// Nhận diện nội dung Nông nghiệp & Kiểm duyệt an toàn mà không tốn API
+  Future<Map<String, dynamic>> mockAnalyzeVideo() async {
+    await Future.delayed(const Duration(seconds: 1)); // Giả lập độ trễ mạng
+    return {
+      'is_agriculture': true,
+      'safety_score': 0.98,
+      'suggested_hashtags': ['#nongnghiep', '#thiennhien', '#toptop'],
+      'category': 'Agriculture',
+    };
+  }
 }

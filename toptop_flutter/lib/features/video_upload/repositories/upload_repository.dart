@@ -131,6 +131,9 @@ class UploadRepository {
     bool allowDownload = true,
     bool allowDuet = true,
     bool isCopyrightProtected = false,
+    List<String>? keyframesPhash,
+    String moderationStatus = 'approved',
+    Map<String, dynamic>? copyrightMatch,
   }) async {
     // 1. Tạo bản ghi video gốc trong bộ sưu tập "videos"
     final videoData = {
@@ -143,12 +146,14 @@ class UploadRepository {
       'totalComments': 0,
       'watchCount': 0,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
-      'moderationStatus': 'approved', // Cho phép hiển thị ngay lập tức
+      'moderationStatus': moderationStatus,
       'hashtags': hashtags,
       'location': location,
       'allowDownload': allowDownload,
       'allowDuet': allowDuet,
       'isCopyrightProtected': isCopyrightProtected,
+      if (keyframesPhash != null) 'keyframes_phash': keyframesPhash,
+      if (copyrightMatch != null) 'copyrightMatch': copyrightMatch,
     };
 
     await _firestore
@@ -197,5 +202,37 @@ class UploadRepository {
       });
     }
     await batch.commit();
+
+    if (moderationStatus == 'pending' && copyrightMatch != null) {
+      await _firestore.collection('copyright_moderation_queue').add({
+        'suspect_video_id': videoId,
+        'suspect_uploader_id': authorId,
+        'original_video_id': copyrightMatch['video_id'],
+        'original_author_id': copyrightMatch['author_id'],
+        'similarity_score': copyrightMatch['calculated_similarity'],
+        'status': 'pending',
+        'created_at': DateTime.now().millisecondsSinceEpoch,
+      });
+    }
+  }
+
+  /// Lấy danh sách vân tay video để đối soát bản quyền
+  Future<List<Map<String, dynamic>>> getAllVideosForCopyrightCheck() async {
+    final snapshot = await _firestore.collection('videos').get();
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      
+      // Lấy vân tay đã lưu trong CSDL, nếu không có thì mặc định là chuỗi rỗng
+      List<String> phash = [];
+      if (data['keyframes_phash'] != null) {
+        phash = List<String>.from(data['keyframes_phash']);
+      }
+      
+      return {
+        'video_id': data['videoId'],
+        'author_id': data['authorId'],
+        'keyframes_phash': phash,
+      };
+    }).toList();
   }
 }

@@ -50,6 +50,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.FileInputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -464,9 +466,8 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
                             @Override
                             public void onSuccess(String requestId, Map resultData) {
                                 String videoUrl = (String) resultData.get("secure_url");
-                                saveDataToFirestore(videoUrl, description, currentUid, finalUsername);
-                                tempFile.delete(); 
-                                mBuilder.setContentTitle("Tải lên thành công").setContentText("Video của bạn đã sẵn sàng!").setProgress(0, 0, false).setOngoing(false);
+                                verifyCopyrightAndSave(videoUrl, description, currentUid, finalUsername, tempFile);
+                                mBuilder.setContentTitle("Đang kiểm tra bản quyền").setContentText("Video đang được kiểm tra trước khi duyệt...").setProgress(0, 0, false).setOngoing(false);
                                 safeNotify();
                             }
 
@@ -486,7 +487,48 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         }).start();
     }
 
-    private void saveDataToFirestore(String videoUrl, String description, String uid, String uName) {
+    private String sha256(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream input = new FileInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) != -1) digest.update(buffer, 0, read);
+        }
+        StringBuilder result = new StringBuilder();
+        for (byte value : digest.digest()) result.append(String.format("%02x", value));
+        return result.toString();
+    }
+
+    private void verifyCopyrightAndSave(String videoUrl, String description, String uid, String uName, File tempFile) {
+        final String fileHash;
+        try {
+            fileHash = sha256(tempFile);
+        } catch (Exception e) {
+            Log.e(TAG, "Fingerprint error", e);
+            tempFile.delete();
+            runOnUiThread(() -> Toast.makeText(this, "Không thể kiểm tra bản quyền video", Toast.LENGTH_LONG).show());
+            return;
+        }
+
+        db.collection("videos").whereEqualTo("copyrightFileHash", fileHash).limit(1).get()
+                .addOnSuccessListener(matches -> {
+                    if (!matches.isEmpty()) {
+                        tempFile.delete();
+                        runOnUiThread(() -> Toast.makeText(this, "Video đã tồn tại trên TopTop và bị từ chối", Toast.LENGTH_LONG).show());
+                        return;
+                    }
+                    saveDataToFirestore(videoUrl, description, uid, uName, fileHash);
+                    tempFile.delete();
+                    mBuilder.setContentTitle("Tải lên thành công").setContentText("Video đang chờ kiểm duyệt.").setProgress(0, 0, false).setOngoing(false);
+                    safeNotify();
+                })
+                .addOnFailureListener(error -> {
+                    tempFile.delete();
+                    runOnUiThread(() -> Toast.makeText(this, "Không thể kiểm tra bản quyền: " + error.getMessage(), Toast.LENGTH_LONG).show());
+                });
+    }
+
+    private void saveDataToFirestore(String videoUrl, String description, String uid, String uName, String fileHash) {
         if (uid.isEmpty()) return;
         Map<String, Object> videoData = new HashMap<>();
         videoData.put("videoId", Id);
@@ -499,6 +541,7 @@ public class DescriptionVideoActivity extends FragmentActivity implements View.O
         videoData.put("watchCount", 0);
         videoData.put("timestamp", System.currentTimeMillis());
         videoData.put("moderationStatus", "pending");
+        videoData.put("copyrightFileHash", fileHash);
         videoData.put("hashtags", hashtags);
 
         db.collection("videos").document(Id).set(videoData);
