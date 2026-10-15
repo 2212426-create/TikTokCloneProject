@@ -4,13 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/shimmer_loading.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../farm_journal/repositories/journal_repository.dart';
+import '../../saved_techniques/repositories/saved_techniques_repository.dart';
+import '../../store/providers/app_mode_provider.dart';
+import '../../store/repositories/store_repository.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/avatar_preview_dialog.dart';
 
-/// Màn hình hồ sơ người dùng (Hồ sơ của mình hoặc người khác)
-/// Port từ ProfileFragment.java và FollowActivity.java
+/// Màn hình Hồ Sơ "Cá Nhân" & Người Dùng Khác
+/// Thiết kế chuẩn mực 7 phần: TopBar, Avatar/Username, Bio, Stats, Action Buttons, Linked Store Card, Content Tabs
 class ProfileScreen extends ConsumerStatefulWidget {
   final String? userId;
 
@@ -23,13 +28,21 @@ class ProfileScreen extends ConsumerStatefulWidget {
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final TextEditingController _bioController = TextEditingController();
   bool _isEditingBio = false;
-  String _originalBio = '';
+  bool _isFollowLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -80,33 +93,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-    // Nếu không truyền userId, mặc định là hiển thị profile của user hiện tại
     final profileId = widget.userId ?? currentUser?.uid ?? '';
     final isMe = profileId == currentUser?.uid;
 
-    // Theme-aware colors
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final cs = theme.colorScheme;
     final bgColor = theme.scaffoldBackgroundColor;
     final onSurface = cs.onSurface;
     final divColor = isDark ? const Color(0xFF333333) : const Color(0xFFE3E3E4);
-    final hintTextColor = isDark ? Colors.white30 : Colors.black38;
     final btnBgColor = isDark ? const Color(0xFF242428) : const Color(0xFFF1F1F3);
 
     if (profileId.isEmpty) {
       return Scaffold(
         backgroundColor: bgColor,
         body: Center(
-          child: Text('Vui lòng đăng nhập để xem hồ sơ', style: TextStyle(color: onSurface.withValues(alpha: 0.5))),
+          child: Text('Vui lòng đăng nhập để xem trang cá nhân', style: TextStyle(color: onSurface.withValues(alpha: 0.5))),
         ),
       );
     }
 
     final profileState = ref.watch(userProfileStreamProvider(profileId));
     final videosState = ref.watch(userVideosStreamProvider(profileId));
+    final storeState = ref.watch(userStoreStreamProvider(profileId));
 
-    // Watch follow status
     final followCompositeKey = "${currentUser?.uid}_$profileId";
     final isFollowing = ref.watch(followStatusStreamProvider(followCompositeKey)).valueOrNull ?? false;
 
@@ -124,7 +134,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             : null,
         title: profileState.when(
           data: (profile) => Text(
-            profile?.fullname ?? 'Hồ sơ',
+            isMe ? 'Cá Nhân' : (profile?.fullname.isNotEmpty == true ? profile!.fullname : 'Hồ sơ'),
             style: TextStyle(color: onSurface, fontWeight: FontWeight.bold, fontSize: 18),
           ),
           loading: () => const SizedBox(),
@@ -146,27 +156,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             );
           }
 
-          // Khởi tạo text controller cho bio
           if (!_isEditingBio && _bioController.text != profile.bio) {
             _bioController.text = profile.bio;
-            _originalBio = profile.bio;
           }
 
           return RefreshIndicator(
             onRefresh: () async {
-              // Kích hoạt đồng bộ hóa lại lượng follow từ repo
               await ref.read(profileRepositoryProvider).syncFollowCounts(profileId);
             },
-            color: AppTheme.primaryColor,
-            backgroundColor: const Color(0xFF1D1D1F),
+            color: AppColors.primary,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
-                  // 1. Ảnh đại diện với gradient ring
+                  // 1. Avatar
                   GestureDetector(
                     onTap: () {
                       showDialog(
@@ -176,48 +182,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     },
                     child: Container(
                       padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: AppTheme.logoGradient,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.25),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                          ),
-                        ],
+                        gradient: AppColors.brandGradient,
                       ),
                       child: CircleAvatar(
-                        radius: 48,
+                        radius: 42,
                         backgroundColor: bgColor,
                         child: CircleAvatar(
-                          radius: 45,
+                          radius: 39,
                           backgroundColor: isDark ? Colors.grey[900] : Colors.grey[200],
                           backgroundImage: profile.avatarUrl.isNotEmpty
                               ? CachedNetworkImageProvider(profile.avatarUrl, maxWidth: 120)
                               : const AssetImage('assets/images/default_avatar.png') as ImageProvider,
                           child: profile.avatarUrl.isEmpty
-                              ? Icon(Icons.person, size: 48, color: onSurface.withValues(alpha: 0.5))
+                              ? Icon(Icons.person, size: 40, color: onSurface.withValues(alpha: 0.5))
                               : null,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
 
-                  // 2. Username hiển thị
+                  // 2. Full Name & Username
+                  if (profile.fullname.isNotEmpty)
+                    Text(
+                      profile.fullname,
+                      style: TextStyle(color: onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
                   Text(
                     '@${profile.username}',
-                    style: TextStyle(
-                      color: onSurface,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                    ),
+                    style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600], fontSize: 13),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
-                  // 3. Glassmorphism stats card
+                  // 3. Bio
+                  if (profile.bio.isNotEmpty || isMe)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        profile.bio.isNotEmpty ? profile.bio : 'Chưa có tiểu sử.',
+                        style: TextStyle(color: onSurface.withValues(alpha: 0.8), fontSize: 13, height: 1.3),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+
+                  // 4. Stats Row
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 24),
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -227,9 +238,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           child: _buildMetricItem(
                             label: 'Đang theo dõi',
                             value: profile.following.toString(),
-                            onTap: () => context.push(
-                              '/user/$profileId/following',
-                            ),
+                            onTap: () => context.push('/user/$profileId/following'),
                           ),
                         ),
                         _buildDivider(),
@@ -237,15 +246,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           child: _buildMetricItem(
                             label: 'Người theo dõi',
                             value: profile.followers.toString(),
-                            onTap: () => context.push(
-                              '/user/$profileId/followers',
-                            ),
+                            onTap: () => context.push('/user/$profileId/followers'),
                           ),
                         ),
                         _buildDivider(),
                         Expanded(
                           child: _buildMetricItem(
-                            label: 'Thích',
+                            label: 'Lượt thích',
                             value: profile.likes.toString(),
                             onTap: null,
                           ),
@@ -253,75 +260,91 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                  // 4. Các nút Hành động (Sửa hồ sơ / Follow + Message)
+                  // 5. Main Action Buttons
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: isMe
-                        ? SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton(
-                              onPressed: () => context.push('/profile/edit'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: onSurface,
-                                side: BorderSide.none,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                minimumSize: const Size(0, 44),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                        ? Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => context.push('/profile/edit'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: onSurface,
+                                    side: BorderSide.none,
+                                    backgroundColor: btnBgColor,
+                                  ),
+                                  child: const Text('Sửa hồ sơ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                 ),
-                                backgroundColor: btnBgColor,
                               ),
-                              child: Text(
-                                'Sửa hồ sơ',
-                                style: TextStyle(fontWeight: FontWeight.w600, color: onSurface, fontSize: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => context.push('/settings'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: onSurface,
+                                    side: BorderSide.none,
+                                    backgroundColor: btnBgColor,
+                                  ),
+                                  child: const Text('Cài đặt', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                ),
                               ),
-                            ),
+                            ],
                           )
                         : Row(
                             children: [
-                              // Nút Follow / Unfollow
+                              // Follow / Unfollow Button with Single-Tap Lock & Loading State
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () async {
-                                    if (currentUser == null) {
-                                      context.go('/auth');
-                                      return;
-                                    }
-                                    final repo = ref.read(profileRepositoryProvider);
-                                    if (isFollowing) {
-                                      await repo.unfollowUser(
-                                        currentUid: currentUser.uid,
-                                        targetUid: profileId,
-                                      );
-                                    } else {
-                                      final myProfile = ref.read(currentUserProfileProvider).valueOrNull;
-                                      final myUsername = myProfile?.username ?? currentUser.email?.split('@')[0] ?? '';
-                                      await repo.followUser(
-                                        currentUid: currentUser.uid,
-                                        targetUid: profileId,
-                                        currentUsername: myUsername,
-                                      );
-                                    }
-                                  },
+                                  onPressed: _isFollowLoading
+                                      ? null
+                                      : () async {
+                                          if (currentUser == null) {
+                                            context.go('/auth');
+                                            return;
+                                          }
+
+                                          setState(() => _isFollowLoading = true);
+                                          final repo = ref.read(profileRepositoryProvider);
+
+                                          try {
+                                            if (isFollowing) {
+                                              await repo.unfollowUser(
+                                                currentUid: currentUser.uid,
+                                                targetUid: profileId,
+                                              );
+                                            } else {
+                                              final myProfile = ref.read(currentUserProfileProvider).valueOrNull;
+                                              final myUsername = myProfile?.username ?? currentUser.email?.split('@')[0] ?? '';
+                                              await repo.followUser(
+                                                currentUid: currentUser.uid,
+                                                targetUid: profileId,
+                                                currentUsername: myUsername,
+                                              );
+                                            }
+                                          } finally {
+                                            if (mounted) setState(() => _isFollowLoading = false);
+                                          }
+                                        },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isFollowing ? Colors.grey[850] : AppTheme.primaryColor,
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: isFollowing ? (isDark ? Colors.grey[850] : Colors.grey[300]) : AppColors.primary,
+                                    foregroundColor: isFollowing ? (isDark ? Colors.white : Colors.black87) : Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
-                                  child: Text(
-                                    isFollowing ? 'Hủy theo dõi' : 'Theo dõi',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
+                                  child: _isFollowLoading
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : Text(
+                                          isFollowing ? 'Đang theo dõi' : 'Theo dõi',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
                                 ),
                               ),
                               const SizedBox(width: 8),
 
-                              // Nút Nhắn tin
+                              // Message Button
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () {
@@ -329,237 +352,300 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                       context.go('/auth');
                                       return;
                                     }
-                                    context.push('/chat/$profileId');
+                                    context.push('/chat/$profileId?name=${Uri.encodeComponent(profile.username)}');
                                   },
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: onSurface,
                                     side: BorderSide.none,
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
                                     backgroundColor: btnBgColor,
                                   ),
-                                  child: Text(
-                                    'Nhắn tin',
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: onSurface, fontSize: 14),
-                                  ),
+                                  child: const Text('Nhắn tin', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                 ),
                               ),
                             ],
                           ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                  // 5. Phần Tiểu sử (Bio)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: _isEditingBio
-                        ? Column(
-                            children: [
-                              TextField(
-                                controller: _bioController,
-                                style: TextStyle(color: onSurface),
-                                decoration: InputDecoration(
-                                  hintText: 'Thêm tiểu sử của bạn...',
-                                  hintStyle: TextStyle(color: hintTextColor),
-                                  enabledBorder: UnderlineInputBorder(
-                                    borderSide: BorderSide(color: divColor),
-                                  ),
-                                  focusedBorder: const UnderlineInputBorder(
-                                    borderSide: BorderSide(color: AppTheme.primaryColor),
-                                  ),
-                                ),
-                                maxLength: 80,
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _bioController.text = _originalBio;
-                                        _isEditingBio = false;
-                                      });
-                                    },
-                                    child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
-                                  ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      await ref.read(profileRepositoryProvider).updateBio(
-                                            profileId,
-                                            _bioController.text.trim(),
-                                          );
-                                      setState(() {
-                                        _originalBio = _bioController.text.trim();
-                                        _isEditingBio = false;
-                                      });
-                                    },
-                                    child: const Text('Cập nhật', style: TextStyle(color: AppTheme.primaryColor)),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          )
-                        : GestureDetector(
-                            onTap: isMe
-                                ? () {
-                                    setState(() {
-                                      _isEditingBio = true;
-                                    });
-                                  }
-                                : null,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    profile.bio.isNotEmpty ? profile.bio : (isMe ? 'Chưa có tiểu sử. Ấn để thêm.' : 'Chưa có tiểu sử.'),
-                                    style: TextStyle(
-                                      color: profile.bio.isNotEmpty
-                                          ? onSurface.withValues(alpha: 0.7)
-                                          : onSurface.withValues(alpha: 0.35),
-                                      fontSize: 14,
-                                      fontStyle: profile.bio.isNotEmpty ? FontStyle.normal : FontStyle.italic,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                if (isMe) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(Icons.edit, color: onSurface.withValues(alpha: 0.3), size: 14),
-                                ],
-                              ],
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 24),
+                  // 6. Linked Store Card
+                  if (storeState != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: storeState.when(
+                        data: (store) {
+                          if (store == null && isMe) {
+                            return _buildStoreCardTile(
+                              title: 'Đăng ký bán hàng',
+                              subtitle: 'Mở gian hàng nông sản, vật tư',
+                              buttonText: 'Đăng ký ngay',
+                              color: AppColors.primary,
+                              onPressed: () => context.push('/store/register'),
+                            );
+                          }
 
-                  // 6. Lưới video tóm tắt
+                          if (store != null) {
+                            if (isMe) {
+                              if (store.status == 'draft') {
+                                return _buildStoreCardTile(
+                                  title: 'Hồ sơ gian hàng dở dang',
+                                  subtitle: 'Bạn có bản nháp chưa gửi',
+                                  buttonText: 'Tiếp tục',
+                                  color: AppColors.warning,
+                                  onPressed: () => context.push('/store/register'),
+                                );
+                              }
+
+                              if (store.status == 'pending') {
+                                return _buildStoreCardTile(
+                                  title: 'Hồ sơ gian hàng đang chờ xét duyệt',
+                                  subtitle: store.storeName,
+                                  buttonText: 'Xem hồ sơ',
+                                  color: Colors.orange,
+                                  onPressed: () => context.push('/store/register'),
+                                );
+                              }
+
+                              if (store.status == 'needs_changes') {
+                                return _buildStoreCardTile(
+                                  title: 'Cần bổ sung thông tin hồ sơ',
+                                  subtitle: store.rejectionReason ?? 'Vui lòng kiểm tra lại thông tin',
+                                  buttonText: 'Cập nhật',
+                                  color: Colors.redAccent,
+                                  onPressed: () => context.push('/store/register'),
+                                );
+                              }
+
+                              if (store.isApproved) {
+                                return _buildStoreCardTile(
+                                  title: 'Gian hàng: ${store.storeName}',
+                                  subtitle: store.storeType == 'individual' ? 'Cá nhân / Nhà vườn' : 'Đơn vị kinh doanh',
+                                  buttonText: 'Vào Gian Hàng',
+                                  color: AppColors.primary,
+                                  onPressed: () async {
+                                    final success = await ref.read(appModeProvider.notifier).switchToSellerMode();
+                                    if (success && mounted) {
+                                      context.go('/seller/overview');
+                                    }
+                                  },
+                                );
+                              }
+                            } else if (store.isApproved) {
+                              // Other user's approved public store
+                              return _buildStoreCardTile(
+                                title: store.storeName,
+                                subtitle: store.storeType == 'individual' ? 'Cá nhân / Nhà vườn' : 'Đơn vị kinh doanh',
+                                buttonText: 'Xem Gian Hàng',
+                                color: AppColors.primary,
+                                onPressed: () => context.push('/store/${store.storeId}'),
+                              );
+                            }
+                          }
+
+                          return const SizedBox.shrink();
+                        },
+                        loading: () => const SizedBox.shrink(),
+                        error: (e, s) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+
+                  // 7. Content Tabs (Video / Nhật ký / Kho kỹ thuật)
                   Divider(color: divColor, height: 1),
-                  videosState.when(
-                    data: (videos) {
-                      if (videos.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(48),
-                          child: Column(
-                            children: [
-                              Icon(Icons.video_library_outlined, color: Colors.grey[700], size: 48),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Chưa có video nào',
-                                style: TextStyle(
-                                  color: isDark ? Colors.white30 : Colors.black38,
-                                  fontSize: 14,
-                                ),
+                  TabBar(
+                    controller: _tabController,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: Colors.grey,
+                    indicatorColor: AppColors.primary,
+                    tabs: [
+                      const Tab(text: 'Videos'),
+                      const Tab(text: 'Nhật ký'),
+                      if (isMe) const Tab(text: 'Kho Kỹ Thuật'),
+                    ],
+                  ),
+
+                  SizedBox(
+                    height: 380,
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        // Tab 1: Video Grid
+                        videosState.when(
+                          data: (videos) {
+                            if (videos.isEmpty) {
+                              return const Center(child: Text('Chưa có video nào.', style: TextStyle(color: Colors.grey)));
+                            }
+                            return GridView.builder(
+                              padding: const EdgeInsets.all(8),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                childAspectRatio: 3 / 4,
+                                crossAxisSpacing: 4,
+                                mainAxisSpacing: 4,
                               ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 3 / 4,
-                          crossAxisSpacing: 2,
-                          mainAxisSpacing: 2,
-                        ),
-                        itemCount: videos.length,
-                        itemBuilder: (context, index) {
-                          final video = videos[index];
-
-                          return RepaintBoundary(
-                            child: GestureDetector(
-                              onTap: () {
-                                context.push('/video/${video.videoId}');
-                              },
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  // Thumbnail (Dùng CachedNetworkImage)
-                                  CachedNetworkImage(
-                                    imageUrl: video.thumbnailUri,
-                                    fit: BoxFit.cover,
-                                    memCacheWidth: 250, // Tối ưu kích thước lưu cache bộ nhớ
-                                    placeholder: (context, url) => Container(
-                                      color: Colors.grey[900],
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white24),
+                              itemCount: videos.length,
+                              itemBuilder: (context, index) {
+                                final video = videos[index];
+                                return GestureDetector(
+                                  onTap: () => context.push('/video/${video.videoId}'),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      CachedNetworkImage(
+                                        imageUrl: video.thumbnailUri,
+                                        fit: BoxFit.cover,
+                                        placeholder: (ctx, url) => Container(color: Colors.grey[900]),
+                                        errorWidget: (ctx, url, err) => Container(color: Colors.grey[900]),
+                                      ),
+                                      Positioned(
+                                        left: 6,
+                                        bottom: 6,
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.play_arrow, color: Colors.white, size: 14),
+                                            Text('${video.watchCount}', style: const TextStyle(color: Colors.white, fontSize: 11)),
+                                          ],
                                         ),
                                       ),
-                                    ),
-                                    errorWidget: (context, url, error) => Container(
-                                      color: Colors.grey[900],
-                                      child: const Icon(Icons.broken_image, color: Colors.white24),
-                                    ),
+                                    ],
                                   ),
+                                );
+                              },
+                            );
+                          },
+                          loading: () => const ShimmerVideoGrid(),
+                          error: (err, stack) => Center(child: Text('Lỗi: $err')),
+                        ),
 
-                                  // Xem lượt xem ở góc trái dưới
-                                  Positioned(
-                                    left: 6,
-                                    bottom: 6,
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.play_arrow_outlined,
-                                          color: Colors.white,
-                                          size: 16,
+                        // Tab 2: Farm Journals
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final journalsAsync = isMe
+                                ? ref.watch(userJournalsStreamProvider(profileId))
+                                : ref.watch(publicJournalsStreamProvider);
+
+                            return journalsAsync.when(
+                              data: (journals) {
+                                final list = isMe
+                                    ? journals
+                                    : journals.where((j) => j.ownerId == profileId && j.privacy == 'public').toList();
+
+                                if (list.isEmpty) {
+                                  return const Center(child: Text('Chưa có nhật ký mùa vụ công khai nào.', style: TextStyle(color: Colors.grey)));
+                                }
+
+                                return ListView.builder(
+                                  padding: const EdgeInsets.all(8),
+                                  itemCount: list.length,
+                                  itemBuilder: (context, index) {
+                                    final j = list[index];
+                                    return Card(
+                                      child: ListTile(
+                                        title: Text(j.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                        subtitle: Text('🌱 ${j.crop} • ${j.region}'),
+                                        trailing: const Icon(Icons.chevron_right),
+                                        onTap: () => context.push('/journal/${j.id}'),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              loading: () => const Center(child: CircularProgressIndicator()),
+                              error: (e, s) => Center(child: Text('Lỗi: $e')),
+                            );
+                          },
+                        ),
+
+                        // Tab 3: Saved Techniques (Private area ONLY for own profile)
+                        if (isMe)
+                          Consumer(
+                            builder: (context, ref, child) {
+                              final savedAsync = ref.watch(savedTechniquesStreamProvider(profileId));
+
+                              return savedAsync.when(
+                                data: (videos) {
+                                  if (videos.isEmpty) {
+                                    return const Center(child: Text('Chưa có kỹ thuật nào được lưu trong kho.', style: TextStyle(color: Colors.grey)));
+                                  }
+
+                                  return ListView.builder(
+                                    padding: const EdgeInsets.all(8),
+                                    itemCount: videos.length,
+                                    itemBuilder: (context, index) {
+                                      final v = videos[index];
+                                      return Card(
+                                        child: ListTile(
+                                          leading: const Icon(Icons.bookmark, color: AppColors.primary),
+                                          title: Text(v.description.isNotEmpty ? v.description : 'Kỹ thuật canh tác', maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          subtitle: Text('🌱 ${v.crop ?? "Nông nghiệp"} • @${v.username}'),
+                                          onTap: () => context.push('/video/${v.videoId}'),
                                         ),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          _formatWatchCount(video.watchCount),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    loading: () => const ShimmerVideoGrid(),
-                    error: (error, _) => Padding(
-                      padding: const EdgeInsets.all(48),
-                      child: Text('Lỗi: ${error.toString()}', style: const TextStyle(color: Colors.redAccent)),
+                                      );
+                                    },
+                                  );
+                                },
+                                loading: () => const Center(child: CircularProgressIndicator()),
+                                error: (e, s) => Center(child: Text('Lỗi: $e')),
+                              );
+                            },
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 80), // Chừa khoảng trống tránh bị đè bởi BottomNavigationBar
                 ],
               ),
             ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Lỗi: $err')),
+      ),
+    );
+  }
+
+  Widget _buildStoreCardTile({
+    required String title,
+    required String subtitle,
+    required String buttonText,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withAlpha(60)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.storefront, color: color, size: 28),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey), maxLines: 2, overflow: TextOverflow.ellipsis),
+              ],
+            ),
           ),
-        ),
-        error: (error, _) => Center(
-          child: Text('Lỗi tải hồ sơ: ${error.toString()}', style: const TextStyle(color: Colors.redAccent)),
-        ),
+          const SizedBox(width: 6),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: Size.zero,
+            ),
+            onPressed: onPressed,
+            child: Text(buttonText, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildDivider() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      width: 1,
-      height: 16,
-      color: isDark ? Colors.white12 : Colors.black12,
-    );
+    return Container(width: 1, height: 16, color: Colors.grey.shade400);
   }
 
   Widget _buildMetricItem({
@@ -567,41 +653,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required String value,
     required VoidCallback? onTap,
   }) {
-    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: cs.onSurface,
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: cs.onSurface.withValues(alpha: 0.5),
-              fontSize: 12,
-            ),
-            textAlign: TextAlign.center,
-          ),
+          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 2),
+          Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         ],
       ),
     );
-  }
-
-  String _formatWatchCount(int count) {
-    if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}M';
-    } else if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}K';
-    }
-    return count.toString();
   }
 }

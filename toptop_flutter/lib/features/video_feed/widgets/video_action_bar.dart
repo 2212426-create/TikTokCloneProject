@@ -7,14 +7,14 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../chat/providers/chat_provider.dart';
+import '../../saved_techniques/repositories/saved_techniques_repository.dart';
 import '../models/video_model.dart';
 import '../providers/video_provider.dart';
 import '../../chat/widgets/video_share_bottom_sheet.dart';
 import '../../comments/widgets/comment_bottom_sheet.dart';
 import '../../profile/providers/profile_provider.dart';
 
-/// Sidebar chứa các nút tương tác (Avatar, Like, Bình luận, Chia sẻ, Tắt/Bật âm)
-/// Port từ VideoAdapter.VideoViewHolder (imvLike, imvComment, imvAvatar, etc.)
+/// Sidebar chứa các nút tương tác (Avatar, Like, Bình luận, Lưu kỹ thuật, Chia sẻ, Tắt/Bật âm)
 class VideoActionBar extends ConsumerWidget {
   final VideoModel video;
 
@@ -71,7 +71,7 @@ class VideoActionBar extends ConsumerWidget {
                               ? CachedNetworkImage(
                                   imageUrl: avatarUrl,
                                   fit: BoxFit.cover,
-                                  memCacheWidth: 100, // Tối ưu kích thước lưu cache bộ nhớ
+                                  memCacheWidth: 100,
                                   placeholder: (context, url) => Container(
                                     color: Colors.grey[850],
                                     child: const Icon(Icons.person, color: Colors.white),
@@ -82,7 +82,7 @@ class VideoActionBar extends ConsumerWidget {
                                   ),
                                 )
                               : Image.asset(
-                                  'assets/images/default_avatar.png', // Fallback
+                                  'assets/images/default_avatar.png',
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) =>
                                       Container(
@@ -92,7 +92,6 @@ class VideoActionBar extends ConsumerWidget {
                                 ),
                         ),
                       ),
-                      // Nút Follow mini giống TikTok - bấm được, biến mất khi đã follow
                       if (currentUser?.uid != video.authorId)
                         Consumer(
                           builder: (context, ref, child) {
@@ -109,7 +108,7 @@ class VideoActionBar extends ConsumerWidget {
                                   HapticFeedback.lightImpact();
                                   if (currentUser == null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Vui lòng đăng nhập để theo dõi người dùng!')),
+                                      const SnackBar(content: Text('Vui lòng đăng nhập để theo dõi nhà vườn!')),
                                     );
                                     context.go('/auth');
                                     return;
@@ -155,7 +154,7 @@ class VideoActionBar extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           // 2. Nút Thích (Like)
           Consumer(
@@ -171,7 +170,7 @@ class VideoActionBar extends ConsumerWidget {
                 icon: Icon(
                   Icons.favorite,
                   color: isLiked ? AppTheme.primaryColor : Colors.white,
-                  size: 36,
+                  size: 34,
                 ),
                 label: _formatCount(likesCount),
                 onTap: () async {
@@ -192,7 +191,6 @@ class VideoActionBar extends ConsumerWidget {
                         currentUsername: username,
                       );
 
-                  // Ghi nhận tương tác like lên Colab RecSys Server
                   ref.read(videoRepositoryProvider).logRecSysInteraction(
                         userId: currentUser.uid,
                         videoId: video.videoId,
@@ -203,7 +201,7 @@ class VideoActionBar extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           // 3. Nút Bình luận
           Consumer(
@@ -215,7 +213,7 @@ class VideoActionBar extends ConsumerWidget {
                 icon: const Icon(
                   Icons.comment,
                   color: Colors.white,
-                  size: 34,
+                  size: 32,
                 ),
                 label: _formatCount(commentsCount),
                 onTap: () {
@@ -232,14 +230,61 @@ class VideoActionBar extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // 4. Nút Chia sẻ (Nút tĩnh, chỉ cần truy cập ref khi bấm)
+          // 4. Nút "Lưu kỹ thuật" (Bookmark icon)
+          Consumer(
+            builder: (context, ref, child) {
+              final currentUser = ref.watch(currentUserProvider);
+              final isSaved = currentUser != null
+                  ? ref.watch(isTechniqueSavedProvider((userId: currentUser.uid, videoId: video.videoId))).valueOrNull ?? false
+                  : false;
+
+              return _buildActionButton(
+                icon: Icon(
+                  isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  color: isSaved ? AppTheme.secondaryColor : Colors.white,
+                  size: 32,
+                ),
+                label: isSaved ? 'Đã lưu' : 'Lưu KT',
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  if (currentUser == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vui lòng đăng nhập để lưu kỹ thuật!')),
+                    );
+                    context.go('/auth');
+                    return;
+                  }
+
+                  final saved = await ref.read(savedTechniquesRepositoryProvider).toggleSaveTechnique(
+                        userId: currentUser.uid,
+                        video: video,
+                      );
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          saved
+                              ? 'Đã lưu video vào Kho Kỹ Thuật!'
+                              : 'Đã xóa video khỏi Kho Kỹ Thuật!',
+                        ),
+                      ),
+                    );
+                  }
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // 5. Nút Chia sẻ
           _buildActionButton(
             icon: const Icon(
               Icons.share,
               color: Colors.white,
-              size: 34,
+              size: 32,
             ),
             label: 'Chia sẻ',
             onTap: () {
@@ -247,9 +292,9 @@ class VideoActionBar extends ConsumerWidget {
               _showShareBottomSheet(context, ref, video);
             },
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // 5. Nút Bật/Tắt âm
+          // 6. Nút Bật/Tắt âm
           Consumer(
             builder: (context, ref, child) {
               final isMuted = ref.watch(videoMuteProvider);
@@ -258,7 +303,7 @@ class VideoActionBar extends ConsumerWidget {
                 icon: Icon(
                   isMuted ? Icons.volume_off : Icons.volume_up,
                   color: Colors.white,
-                  size: 30,
+                  size: 28,
                 ),
                 label: isMuted ? 'Muted' : 'Mở',
                 onTap: () {
@@ -297,12 +342,12 @@ class VideoActionBar extends ConsumerWidget {
             ),
             child: icon,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
               shadows: [
                 Shadow(
@@ -359,7 +404,7 @@ class VideoActionBar extends ConsumerWidget {
             children: [
               const SizedBox(height: 16),
               const Text(
-                'Chia sẻ video',
+                'Chia sẻ video kỹ thuật',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -373,7 +418,6 @@ class VideoActionBar extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    // Nút Tải xuống (kiểm tra allowDownload)
                     _buildShareOption(
                       icon: Icons.download_rounded,
                       label: 'Tải xuống',
@@ -412,7 +456,6 @@ class VideoActionBar extends ConsumerWidget {
                       label: 'Gửi tin nhắn',
                       color: Colors.blue,
                       onTap: () {
-                        // Ghi nhận sở thích (Share weight: 4)
                         if (currentUser != null) {
                           ref.read(videoRepositoryProvider).recordInterest(
                             tags: video.hashtags,
@@ -421,7 +464,7 @@ class VideoActionBar extends ConsumerWidget {
                           );
                         }
 
-                        Navigator.pop(context); // Đóng share sheet
+                        Navigator.pop(context);
                         showModalBottomSheet(
                           context: context,
                           isScrollControlled: true,
@@ -437,20 +480,11 @@ class VideoActionBar extends ConsumerWidget {
                         label: 'Xóa video',
                         color: const Color(0xFFFE2C55),
                         onTap: () {
-                          Navigator.pop(context); // Close bottom sheet
+                          Navigator.pop(context);
                           _showDeleteConfirmDialog(context, ref, video);
                         },
                       ),
                     ],
-                    const SizedBox(width: 20),
-                    _buildShareOption(
-                      icon: Icons.more_horiz,
-                      label: 'Thêm',
-                      color: Colors.grey,
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
-                    ),
                   ],
                 ),
               ),
@@ -483,7 +517,7 @@ class VideoActionBar extends ConsumerWidget {
                 backgroundColor: const Color(0xFFFE2C55),
               ),
               onPressed: () async {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(context);
                 try {
                   await ref.read(videoRepositoryProvider).deleteVideo(
                         videoId: video.videoId,
@@ -493,7 +527,7 @@ class VideoActionBar extends ConsumerWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Đã xóa video thành công!')),
                     );
-                    context.go('/home'); // Redirect to home feed
+                    context.go('/home');
                   }
                 } catch (e) {
                   if (context.mounted) {
@@ -523,7 +557,7 @@ class VideoActionBar extends ConsumerWidget {
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: color.withValues(alpha: 0.2),
+            backgroundColor: color.withAlpha(50),
             child: Icon(icon, color: Colors.white, size: 24),
           ),
           const SizedBox(height: 8),

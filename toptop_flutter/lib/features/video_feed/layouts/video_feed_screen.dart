@@ -11,7 +11,6 @@ import '../widgets/ad_player_widget.dart';
 import '../models/feed_item.dart';
 
 /// Màn hình chính phát video cuộn dọc (Video Feed)
-/// Port từ VideoFragment.java và hỗ trợ thêm quảng cáo và chiến dịch du lịch
 class VideoFeedScreen extends ConsumerWidget {
   const VideoFeedScreen({super.key});
 
@@ -51,7 +50,6 @@ class VideoFeedScreen extends ConsumerWidget {
 
               return RefreshIndicator(
                 onRefresh: () async {
-                  // Làm mới provider tương ứng với tab đang chọn
                   if (selectedTab == HomeTab.lamDong) {
                     ref.invalidate(lamDongVideoFeedProvider);
                     await ref.read(lamDongVideoFeedProvider.future);
@@ -66,7 +64,7 @@ class VideoFeedScreen extends ConsumerWidget {
                 color: Colors.white,
                 backgroundColor: Colors.black,
                 child: PageView.builder(
-                  key: ValueKey(selectedTab), // Đảm bảo reset PageView khi đổi tab
+                  key: ValueKey(selectedTab),
                   scrollDirection: Axis.vertical,
                   itemCount: items.length,
                   itemBuilder: (context, index) {
@@ -79,7 +77,6 @@ class VideoFeedScreen extends ConsumerWidget {
 
                       return GestureDetector(
                         onHorizontalDragEnd: (details) {
-                          // Nhận diện vuốt trái (từ phải qua trái) trên video feed để chuyển sang trang cá nhân tác giả
                           if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
                             context.push('/user/${video.authorId}');
                           }
@@ -87,26 +84,19 @@ class VideoFeedScreen extends ConsumerWidget {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            // 1. Trình phát Video nền
                             VideoPlayerWidget(video: video),
-
-                            // 2. Overlay thông tin ở góc trái dưới
                             VideoOverlay(
                               video: video,
                               onCampaignBadgeTap: () {
-                                // Ghi nhận click chiến dịch
                                 ref.read(videoRepositoryProvider).recordCampaignClick(video.videoId);
-
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Cảm ơn bạn đã tham gia chiến dịch quảng bá du lịch Đà Lạt! 🌲'),
+                                    content: Text('Cảm ơn bạn đã tham gia chiến dịch nông nghiệp Lâm Đồng! 🌲'),
                                     duration: Duration(seconds: 2),
                                   ),
                                 );
                               },
                             ),
-
-                            // 3. Action bar dọc ở góc phải dưới
                             VideoActionBar(video: video),
                           ],
                         ),
@@ -138,22 +128,78 @@ class VideoFeedScreen extends ConsumerWidget {
             ),
           ),
 
-          // 2. Thanh ngang đề xuất trên cùng
+          // 2. Header Shortcuts: Dùng Stack + Positioned + FittedBox để tuyệt đối không bao giờ tràn lề (overflow)
           SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildTopTab(ref, 'Đang Follow', HomeTab.following, selectedTab == HomeTab.following),
-                    _buildDivider(),
-                    _buildTopTab(ref, 'Lâm Đồng', HomeTab.lamDong, selectedTab == HomeTab.lamDong),
-                    _buildDivider(),
-                    _buildTopTab(ref, 'Dành cho bạn', HomeTab.forYou, selectedTab == HomeTab.forYou),
-                  ],
-                ),
+            child: Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Stack(
+                children: [
+                  // Nút Tìm kiếm ở góc trái
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        icon: const Icon(Icons.search, color: Colors.white, size: 24),
+                        tooltip: 'Tìm kiếm',
+                        onPressed: () => context.push('/search'),
+                      ),
+                    ),
+                  ),
+
+                  // Cụm 3 Tab ở chính giữa - dùng FittedBox scaleDown tự động co giãn vừa khít màn hình
+                  Align(
+                    alignment: Alignment.center,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 72),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildTopTab(ref, 'Follow', HomeTab.following, selectedTab == HomeTab.following),
+                            _buildDivider(),
+                            _buildTopTab(ref, 'Lâm Đồng', HomeTab.lamDong, selectedTab == HomeTab.lamDong),
+                            _buildDivider(),
+                            _buildTopTab(ref, 'Dành cho bạn', HomeTab.forYou, selectedTab == HomeTab.forYou),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Nút Tin nhắn & Thông báo ở góc phải
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 22),
+                            tooltip: 'Tin nhắn',
+                            onPressed: () => context.push('/inbox'),
+                          ),
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+                            tooltip: 'Thông báo',
+                            onPressed: () => context.push('/notifications'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -164,12 +210,12 @@ class VideoFeedScreen extends ConsumerWidget {
 
   Widget _buildDivider() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Text(
         '|',
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.3),
-          fontSize: 12,
+          color: Colors.white.withAlpha(80),
+          fontSize: 11,
         ),
       ),
     );
@@ -187,7 +233,7 @@ class VideoFeedScreen extends ConsumerWidget {
             title,
             style: TextStyle(
               color: isActive ? Colors.white : Colors.white60,
-              fontSize: 16,
+              fontSize: 13,
               fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
               shadows: const [
                 Shadow(blurRadius: 8, color: Colors.black54, offset: Offset(0, 1)),
@@ -196,9 +242,9 @@ class VideoFeedScreen extends ConsumerWidget {
           ),
           if (isActive)
             Container(
-              margin: const EdgeInsets.only(top: 4),
+              margin: const EdgeInsets.only(top: 2),
               height: 2,
-              width: 28,
+              width: 20,
               color: Colors.white,
             ),
         ],
@@ -206,4 +252,3 @@ class VideoFeedScreen extends ConsumerWidget {
     );
   }
 }
-

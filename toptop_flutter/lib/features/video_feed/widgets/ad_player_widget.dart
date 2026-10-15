@@ -31,7 +31,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
   VideoPlayerController? _controller;
   bool _isVisible = false;
 
-  // Biến phục vụ đo lường tương tác quảng cáo
   Timer? _viewTimer;
   bool _hasLoggedImpression = false;
   bool _hasLoggedView = false;
@@ -39,7 +38,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    // Không khởi tạo controller ngay lập tức để tiết kiệm tài nguyên
   }
 
   void _initController() {
@@ -89,14 +87,12 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
   }
 
   Future<void> _launchCtaUrl() async {
-    // Ghi nhận Click quảng cáo
     final currentUserId = ref.read(currentUserProvider)?.uid ?? 'guest';
     ref.read(videoRepositoryProvider).logAdClick(
           adId: widget.ad.adId,
           userId: currentUserId,
         );
 
-    // Chuẩn hóa target URL: Tự động thêm https:// nếu thiếu giao thức
     String targetUrl = widget.ad.targetUrl.trim();
     if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
       targetUrl = 'https://$targetUrl';
@@ -104,8 +100,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
 
     final url = Uri.parse(targetUrl);
     try {
-      // Bỏ canLaunchUrl vì lý do bảo mật hệ điều hành có thể trả về false giả,
-      // thay vào đó thử launchUrl trực tiếp và bắt ngoại lệ
       final success = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!success && mounted) {
         throw Exception('Không thể mở URL');
@@ -297,7 +291,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
               _controller!.play();
             }
 
-            // Ghi nhận lượt hiển thị (Impression) khi xuất hiện trên 50%
             if (!_hasLoggedImpression) {
               final currentUserId = ref.read(currentUserProvider)?.uid ?? 'guest';
               ref.read(videoRepositoryProvider).logAdImpression(
@@ -307,7 +300,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
               _hasLoggedImpression = true;
             }
 
-            // Bắt đầu theo dõi lượt xem trên 2 giây (View)
             _viewTimer?.cancel();
             _viewTimer = Timer(const Duration(seconds: 2), () {
               if (mounted && !_hasLoggedView) {
@@ -328,11 +320,9 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
           }
         }
 
-        // Tối ưu giải phóng RAM: Khi video hoàn toàn khuất màn hình
         if (info.visibleFraction == 0.0) {
           _disposeController();
           _viewTimer?.cancel();
-          // Reset flags khi video biến mất hoàn toàn để có thể log lại nếu xem lại
           _hasLoggedImpression = false;
           _hasLoggedView = false;
         }
@@ -372,20 +362,26 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
                   ),
           ),
 
-          // Hiển thị icon Pause ở giữa màn hình nếu đang tạm dừng thủ công
+          // Hiển thị icon Pause/Play ở giữa màn hình nếu đang tạm dừng thủ công
           if (hasController && !_controller!.value.isPlaying)
             Align(
               alignment: Alignment.center,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Colors.black45,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_arrow,
-                  size: 50,
-                  color: Colors.white,
+              child: IgnorePointer(
+                child: Semantics(
+                  label: 'Phát quảng cáo',
+                  button: true,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Colors.black45,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow,
+                      size: 50,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -404,7 +400,7 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 52, // Nằm ngay trên thanh CTA
+              bottom: 52,
               child: VideoProgressIndicator(
                 _controller!,
                 allowScrubbing: true,
@@ -416,16 +412,14 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
               ),
             ),
 
-          // Cửa sổ thông tin tài trợ đè lên phía dưới bên trái
           Positioned(
             left: 16,
-            bottom: 62, // Ngay trên thanh tiến trình
-            right: 90, // Để khoảng trống bên phải
+            bottom: 62,
+            right: 90,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Badge Được tài trợ + Tên nhà tài trợ
                 Row(
                   children: [
                     Container(
@@ -457,7 +451,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
                 ),
                 const SizedBox(height: 8),
 
-                // Mô tả quảng cáo
                 Text(
                   widget.ad.description,
                   style: const TextStyle(
@@ -472,14 +465,12 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
             ),
           ),
 
-          // Thanh Action Bar bên phải cho quảng cáo (chỉ hiển thị Nút Chia sẻ hoặc Báo cáo)
           Positioned(
             right: 12,
-            bottom: 80, // Nằm cân đối phía trên thanh CTA
+            bottom: 80,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Nhà tài trợ Avatar giả lập
                 Container(
                   width: 46,
                   height: 46,
@@ -502,7 +493,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
                 ),
                 const SizedBox(height: 24),
 
-                // Nút CTA nhỏ bên sườn
                 IconButton(
                   icon: const Icon(Icons.open_in_new_rounded, color: Colors.white, size: 30),
                   onPressed: _launchCtaUrl,
@@ -513,7 +503,6 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
                 ),
                 const SizedBox(height: 20),
 
-                // Nút Báo cáo quảng cáo
                 IconButton(
                   icon: const Icon(Icons.report_gmailerrorred_rounded, color: Colors.white, size: 30),
                   onPressed: () => _showReportDialog(context),
@@ -526,11 +515,10 @@ class _AdPlayerWidgetState extends ConsumerState<AdPlayerWidget> {
             ),
           ),
 
-          // Thanh CTA to, bắt mắt ở dưới đáy (Call To Action Bar)
           Positioned(
             left: 0,
             right: 0,
-            bottom: 0, // Sát đáy body (trên thanh bottom nav)
+            bottom: 0,
             child: GestureDetector(
               onTap: _launchCtaUrl,
               child: Container(

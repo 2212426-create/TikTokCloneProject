@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../video_feed/models/video_model.dart';
@@ -39,7 +40,6 @@ class _VideoShareBottomSheetState extends ConsumerState<VideoShareBottomSheet> {
     final repo = ref.read(chatRepositoryProvider);
     final caption = _captionController.text.trim();
 
-    // 1. One-tap send for single recipient
     if (singleRecipientId != null) {
       await repo.sendVideoShare(
         senderId: currentUser.uid,
@@ -57,7 +57,6 @@ class _VideoShareBottomSheetState extends ConsumerState<VideoShareBottomSheet> {
       return;
     }
 
-    // 2. Mass sharing for selected recipients
     if (_selectedRecipients.isEmpty) return;
     
     for (final recipientId in _selectedRecipients) {
@@ -94,27 +93,17 @@ class _VideoShareBottomSheetState extends ConsumerState<VideoShareBottomSheet> {
       child: Column(
         children: [
           _buildHandle(),
-          const Text('Gửi tới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text('Gửi tới', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
           const SizedBox(height: 12),
 
-          // Horizontal Actions
-          _buildActionRow(shareUrl),
+          _buildActionRow(shareUrl, isDark),
           const Divider(height: 1, color: Colors.black12),
 
-          // Search & Quick Share
           _buildSearchAndCaption(isDark),
 
-          // List of Friends/Groups
           Expanded(
             child: conversationsAsync.when(
               data: (convs) {
-                final filtered = convs.where((c) {
-                  final isGroup = c['isGroup'] == true;
-                  final title = (isGroup ? (c['title'] ?? '') : (c['title'] ?? '')).toString().toLowerCase();
-                  // We need to fetch individual names too if not available in map
-                  return title.contains(_searchQuery);
-                }).toList();
-
                 if (convs.isEmpty) {
                   return const Center(child: Text('Chưa có cuộc trò chuyện nào.'));
                 }
@@ -167,34 +156,38 @@ class _VideoShareBottomSheetState extends ConsumerState<VideoShareBottomSheet> {
     );
   }
 
-  Widget _buildActionRow(String shareUrl) {
+  Widget _buildActionRow(String shareUrl, bool isDark) {
     return Container(
       height: 90,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          _buildOption(Icons.copy, 'Sao chép', () {
+          _buildOption(Icons.copy, 'Sao chép', isDark, () {
             Clipboard.setData(ClipboardData(text: shareUrl));
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã sao chép link!')));
           }),
-          _buildOption(Icons.download_rounded, 'Tải về', () {}),
-          _buildOption(Icons.qr_code_scanner_rounded, 'Mã QR', () {}),
-          _buildOption(Icons.sms_rounded, 'Tin nhắn', () {}),
-          _buildOption(Icons.more_horiz, 'Thêm', () {}),
+          _buildOption(Icons.download_rounded, 'Tải về', isDark, () {}),
+          _buildOption(Icons.qr_code_scanner_rounded, 'Mã QR', isDark, () {}),
+          _buildOption(Icons.sms_rounded, 'Tin nhắn', isDark, () {}),
+          _buildOption(Icons.more_horiz, 'Thêm', isDark, () {}),
         ],
       ),
     );
   }
 
-  Widget _buildOption(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildOption(IconData icon, String label, bool isDark, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       child: Container(
         width: 80, padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           children: [
-            CircleAvatar(radius: 24, backgroundColor: Colors.grey.withValues(alpha: 0.1), child: Icon(icon, color: Colors.black, size: 24)),
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: isDark ? Colors.white12 : Colors.grey[200],
+              child: Icon(icon, color: isDark ? Colors.white : Colors.black87, size: 24),
+            ),
             const SizedBox(height: 6),
             Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
           ],
@@ -204,33 +197,50 @@ class _VideoShareBottomSheetState extends ConsumerState<VideoShareBottomSheet> {
   }
 
   Widget _buildSearchAndCaption(bool isDark) {
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? AppTheme.textHint : Colors.grey[600];
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           Container(
             height: 40,
-            decoration: BoxDecoration(color: isDark ? Colors.white12 : Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: isDark ? Colors.white12 : Colors.grey[200], borderRadius: BorderRadius.circular(8)),
             child: TextField(
               controller: _searchController,
+              cursorColor: AppColors.primary,
+              style: TextStyle(color: textColor, fontSize: 14),
               onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Tìm kiếm bạn bè...',
-                prefixIcon: Icon(Icons.search, size: 20),
+                hintStyle: TextStyle(fontSize: 13, color: hintColor),
+                prefixIcon: Icon(Icons.search, size: 20, color: hintColor),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
           ),
           const SizedBox(height: 12),
+
           TextField(
             controller: _captionController,
+            cursorColor: AppColors.primary,
+            style: TextStyle(color: textColor, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Thêm tin nhắn...',
-              hintStyle: const TextStyle(fontSize: 14),
-              border: OutlineInputBorder(
+              hintStyle: TextStyle(fontSize: 14, color: hintColor),
+              filled: false,
+              enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+                borderSide: BorderSide(color: isDark ? Colors.white24 : Colors.grey[400]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
@@ -275,6 +285,7 @@ class _RecipientTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return FutureBuilder(
       future: isGroup ? Future.value(null) : ref.read(userProfileStreamProvider(id).future),
       builder: (context, snap) {
@@ -299,7 +310,14 @@ class _RecipientTile extends ConsumerWidget {
                 )),
             ],
           ),
-          title: Text(isGroup ? displayTitle : '@$displayTitle', style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+          title: Text(
+            isGroup ? displayTitle : '@$displayTitle',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
           trailing: isSelected ? null : ElevatedButton(
             onPressed: onQuickSend,
             style: ElevatedButton.styleFrom(

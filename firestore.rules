@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdminOrModerator() {
+      return isSignedIn() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'moderator']);
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isOwner(userId) || isAdminOrModerator();
+      allow delete: if isAdminOrModerator();
+
+      match /saved_techniques/{videoId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // 2. Stores collection (Gian hàng)
+    match /stores/{storeId} {
+      allow read: if resource.data.status == 'approved' ||
+                  (isSignedIn() && resource.data.ownerId == request.auth.uid) ||
+                  isAdminOrModerator();
+      allow create: if isSignedIn();
+      allow update: if (isSignedIn() && resource.data.ownerId == request.auth.uid) || isAdminOrModerator();
+      allow delete: if isAdminOrModerator();
+    }
+
+    // 3. Videos collection
+    match /videos/{videoId} {
+      allow read: if resource.data.moderationStatus == 'approved' ||
+                  resource.data.isPublic == true ||
+                  (isSignedIn() && resource.data.authorId == request.auth.uid) ||
+                  isAdminOrModerator();
+      allow create: if isSignedIn();
+      allow update, delete: if (isSignedIn() && resource.data.authorId == request.auth.uid) || isAdminOrModerator();
+    }
+
+    // 4. Journals collection
+    match /journals/{journalId} {
+      allow read: if resource.data.privacy == 'public' ||
+                  (isSignedIn() && resource.data.ownerId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      match /entries/{entryId} {
+        allow read: if get(/databases/$(database)/documents/journals/$(journalId)).data.privacy == 'public' ||
+                    (isSignedIn() && get(/databases/$(database)/documents/journals/$(journalId)).data.ownerId == request.auth.uid);
+        allow create, update, delete: if isSignedIn() &&
+          get(/databases/$(database)/documents/journals/$(journalId)).data.ownerId == request.auth.uid;
+      }
+    }
+
+    // 5. Products collection
+    match /products/{productId} {
+      allow read: if resource.data.status == 'active' ||
+                  (isSignedIn() && resource.data.sellerId == request.auth.uid) ||
+                  isAdminOrModerator();
+      allow create: if isSignedIn();
+      allow update, delete: if (isSignedIn() && resource.data.sellerId == request.auth.uid) || isAdminOrModerator();
+    }
+
+    // 6. Carts collection
+    match /carts/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // 7. Quote Requests collection
+    match /quote_requests/{quoteId} {
+      allow read, write: if isSignedIn() &&
+        (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid);
+      allow create: if isSignedIn();
+    }
+
+    // 8. Orders collection
+    match /orders/{orderId} {
+      allow read: if isSignedIn() &&
+        (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdminOrModerator());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() &&
+        (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdminOrModerator());
+    }
+  }
+}

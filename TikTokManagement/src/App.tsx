@@ -1,14 +1,11 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { useState } from 'react';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopHeader } from './components/layout/TopHeader';
 import { Dashboard } from './pages/Dashboard';
 import { Users } from './pages/Users';
 import { Moderation } from './pages/Moderation';
+import { StoreModeration } from './pages/StoreModeration';
+import { Products } from './pages/Products';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Ads } from './pages/Ads';
@@ -21,7 +18,6 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, loading } = useAuth();
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -33,7 +29,6 @@ export default function App() {
     );
   }
 
-  // Not logged in → show login page
   if (!user) {
     return <LoginPage />;
   }
@@ -46,6 +41,10 @@ export default function App() {
         return <Users />;
       case 'moderation':
         return (user.role === 'admin' || user.role === 'moderator') ? <Moderation /> : <Dashboard onNavigate={setCurrentTab} />;
+      case 'stores':
+        return (user.role === 'admin' || user.role === 'moderator') ? <StoreModeration /> : <Dashboard onNavigate={setCurrentTab} />;
+      case 'products':
+        return (user.role === 'admin' || user.role === 'moderator') ? <Products /> : <Dashboard onNavigate={setCurrentTab} />;
       case 'reports':
         return <Reports />;
       case 'ads':
@@ -65,10 +64,10 @@ export default function App() {
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
-      
+
       <div className="flex-1 flex flex-col md:ml-[280px] w-full min-h-screen">
         <TopHeader onMenuClick={() => setMobileOpen(true)} />
-        
+
         <main className="flex-1 p-6 max-w-[1440px] mx-auto w-full">
           {renderContent()}
         </main>

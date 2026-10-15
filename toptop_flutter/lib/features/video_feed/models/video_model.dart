@@ -1,5 +1,5 @@
 /// Model video - ánh xạ từ Firestore collection "videos"
-/// Port từ Video.java trong Android project
+/// Bổ sung các trường dữ liệu nông nghiệp cho "Nông Video"
 class VideoModel {
   final String videoId;
   final String videoUri;
@@ -17,6 +17,17 @@ class VideoModel {
   final bool allowDuet;
   final bool isCopyrightProtected;
 
+  // ── Mở rộng Nông Nghiệp ──────────────────────────────────────────
+  final String? crop;              // Cây trồng (ví dụ: Sầu riêng, Cà phê, Lúa...)
+  final String? growthStage;       // Giai đoạn (ví dụ: Gieo hạt, Ra hoa, Đậu quả, Thu hoạch...)
+  final String? region;            // Khu vực (ví dụ: Lâm Đồng, Đắk Lắk, Cần Thơ...)
+  final String? technicalTopic;    // Chủ đề kỹ thuật (ví dụ: Phòng trừ sâu bệnh, Bón phân, Cắt tỉa...)
+  final String? relatedJournalId;  // ID nhật ký mùa vụ liên quan
+  final List<String> taggedProductIds; // Các sản phẩm gắn kèm
+  final double? latitude;
+  final double? longitude;
+  final bool isPublic;
+
   VideoModel({
     required this.videoId,
     required this.videoUri,
@@ -33,10 +44,28 @@ class VideoModel {
     this.allowDownload = true,
     this.allowDuet = true,
     this.isCopyrightProtected = false,
+    this.crop,
+    this.growthStage,
+    this.region,
+    this.technicalTopic,
+    this.relatedJournalId,
+    this.taggedProductIds = const [],
+    this.latitude,
+    this.longitude,
+    this.isPublic = true,
   });
 
   factory VideoModel.fromMap(Map<String, dynamic> map, [String? id]) {
     final vId = map['videoId'] as String? ?? '';
+
+    // Xử lý vị trí cũ (location dạng String) hoặc map địa lý mới
+    String? locStr;
+    if (map['location'] is String) {
+      locStr = map['location'] as String;
+    } else if (map['location'] is Map) {
+      locStr = (map['location'] as Map)['name'] as String?;
+    }
+
     return VideoModel(
       videoId: vId.isNotEmpty ? vId : (id ?? ''),
       videoUri: map['videoUri'] as String? ?? '',
@@ -52,10 +81,22 @@ class VideoModel {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
-      location: map['location'] as String?,
+      location: locStr ?? map['region'] as String?,
       allowDownload: map['allowDownload'] as bool? ?? true,
       allowDuet: map['allowDuet'] as bool? ?? true,
       isCopyrightProtected: map['isCopyrightProtected'] as bool? ?? false,
+      crop: map['crop'] as String?,
+      growthStage: map['growthStage'] as String?,
+      region: map['region'] as String? ?? locStr,
+      technicalTopic: map['technicalTopic'] as String?,
+      relatedJournalId: map['relatedJournalId'] as String?,
+      taggedProductIds: (map['taggedProductIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
+      isPublic: map['isPublic'] as bool? ?? true,
     );
   }
 
@@ -75,6 +116,15 @@ class VideoModel {
         'allowDownload': allowDownload,
         'allowDuet': allowDuet,
         'isCopyrightProtected': isCopyrightProtected,
+        'crop': crop,
+        'growthStage': growthStage,
+        'region': region,
+        'technicalTopic': technicalTopic,
+        'relatedJournalId': relatedJournalId,
+        'taggedProductIds': taggedProductIds,
+        'latitude': latitude,
+        'longitude': longitude,
+        'isPublic': isPublic,
       };
 
   VideoModel copyWith({
@@ -93,6 +143,15 @@ class VideoModel {
     bool? allowDownload,
     bool? allowDuet,
     bool? isCopyrightProtected,
+    String? crop,
+    String? growthStage,
+    String? region,
+    String? technicalTopic,
+    String? relatedJournalId,
+    List<String>? taggedProductIds,
+    double? latitude,
+    double? longitude,
+    bool? isPublic,
   }) {
     return VideoModel(
       videoId: videoId ?? this.videoId,
@@ -110,6 +169,15 @@ class VideoModel {
       allowDownload: allowDownload ?? this.allowDownload,
       allowDuet: allowDuet ?? this.allowDuet,
       isCopyrightProtected: isCopyrightProtected ?? this.isCopyrightProtected,
+      crop: crop ?? this.crop,
+      growthStage: growthStage ?? this.growthStage,
+      region: region ?? this.region,
+      technicalTopic: technicalTopic ?? this.technicalTopic,
+      relatedJournalId: relatedJournalId ?? this.relatedJournalId,
+      taggedProductIds: taggedProductIds ?? this.taggedProductIds,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      isPublic: isPublic ?? this.isPublic,
     );
   }
 }

@@ -1,11 +1,10 @@
-// ignore_for_file: prefer_initializing_formals
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/text_utils.dart';
 import '../../auth/models/profile_model.dart';
 import '../../video_feed/models/video_model.dart';
 
-/// Repository thực hiện các truy vấn tìm kiếm người dùng và video trên Firestore
+/// Repository thực hiện các truy vấn tìm kiếm người dùng, video, hashtag và 7-day trending
 class SearchRepository {
   final FirebaseFirestore _firestore;
 
@@ -13,115 +12,142 @@ class SearchRepository {
     required FirebaseFirestore firestore,
   }) : _firestore = firestore;
 
-  /// Tìm kiếm người dùng theo username (prefix matching)
+  /// Tìm kiếm người dùng theo username/fullname (Hỗ trợ tiếng Việt không dấu)
   Future<List<ProfileModel>> searchUsers(String key) async {
-    if (key.trim().isEmpty) return [];
-    
+    final cleanKey = TextUtils.removeDiacritics(key);
+    if (cleanKey.isEmpty) return [];
+
     final snapshot = await _firestore
         .collection(AppConstants.profilesCollection)
-        .orderBy('username')
-        .startAt([key])
-        .endAt(['$key\uf8ff'])
-        .limit(5)
+        .limit(30)
         .get();
 
     return snapshot.docs
         .map((doc) => ProfileModel.fromMap(doc.data()))
+        .where((profile) {
+          final normUsername = TextUtils.removeDiacritics(profile.username);
+          final normFullname = TextUtils.removeDiacritics(profile.fullname);
+          return normUsername.contains(cleanKey) || normFullname.contains(cleanKey);
+        })
+        .take(15)
         .toList();
   }
 
-  /// Tìm kiếm video theo hashtag hoặc description
+  /// Tìm kiếm video theo mô tả, hashtag, cây trồng, chủ đề kỹ thuật (Chuẩn hóa tiếng Việt không dấu)
   Future<List<VideoModel>> searchVideos(String key) async {
-    if (key.trim().isEmpty) return [];
+    final cleanKey = TextUtils.removeDiacritics(key);
+    if (cleanKey.isEmpty) return [];
 
-    final cleanKey = key.trim();
-    
-    // Nếu từ khóa bắt đầu bằng #, tìm kiếm theo mảng hashtags
-    if (cleanKey.startsWith('#') && !cleanKey.contains(' ')) {
-      final tag = cleanKey.substring(1).toLowerCase();
-      final snapshot = await _firestore
-          .collection(AppConstants.videosCollection)
-          .where('hashtags', arrayContains: tag)
-          .limit(10)
-          .get();
-
-      return _filterApprovedVideos(snapshot);
-    }
-
-    // Ngược lại, tìm kiếm theo mô tả (prefix matching trên description)
     final snapshot = await _firestore
         .collection(AppConstants.videosCollection)
-        .orderBy('description')
-        .startAt([cleanKey])
-        .endAt(['$cleanKey\uf8ff'])
-        .limit(10)
+        .limit(100)
         .get();
 
-    final results = _filterApprovedVideos(snapshot);
+    final allApproved = snapshot.docs
+        .map((doc) => VideoModel.fromMap(doc.data(), doc.id))
+        .where((v) => v.moderationStatus == 'approved' || v.isPublic)
+        .toList();
 
-    // Nếu không tìm thấy kết quả theo mô tả, thử tìm kiếm theo hashtag tương đương (fallback)
-    if (results.isEmpty) {
-      final fallbackSnapshot = await _firestore
-          .collection(AppConstants.videosCollection)
-          .where('hashtags', arrayContains: cleanKey.toLowerCase())
-          .limit(10)
-          .get();
-      return _filterApprovedVideos(fallbackSnapshot);
-    }
+    final matched = allApproved.where((video) {
+      final normDesc = TextUtils.removeDiacritics(video.description);
+      final normCrop = TextUtils.removeDiacritics(video.crop ?? '');
+      final normStage = TextUtils.removeDiacritics(video.growthStage ?? '');
+      final normTopic = TextUtils.removeDiacritics(video.technicalTopic ?? '');
+      final normUser = TextUtils.removeDiacritics(video.username);
 
-    return results;
+      final matchesHashtag = video.hashtags.any((tag) {
+        final normTag = TextUtils.normalizeHashtag(tag);
+        return normTag.contains(cleanKey);
+      });
+
+      return normDesc.contains(cleanKey) ||
+          normCrop.contains(cleanKey) ||
+          normStage.contains(cleanKey) ||
+          normTopic.contains(cleanKey) ||
+          normUser.contains(cleanKey) ||
+          matchesHashtag;
+    }).toList();
+
+    // Sắp xếp ưu tiên độ liên quan (tên cây trồng / hashtag khớp chính xác lên đầu)
+    matched.sort((a, b) {
+      final aCropExact = TextUtils.removeDiacritics(a.crop ?? '') == cleanKey ? 1 : 0;
+      final bCropExact = TextUtils.removeDiacritics(b.crop ?? '') == cleanKey ? 1 : 0;
+      if (aCropExact != bCropExact) return bCropExact.compareTo(aCropExact);
+      return b.timestamp.compareTo(a.timestamp);
+    });
+
+    return matched.take(20).toList();
   }
 
-  /// Tải các video thịnh hành nhất (xếp theo watchCount giảm dần)
+  /// Tải các video THỊNH HÀNH 7 NGẦN NHẤT (dựa trên thời gian 7 ngày & tương tác thực tế)
   Future<List<VideoModel>> loadTrendingVideos() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final sevenDaysAgo = now - (7 * 86400 * 1000);
+
     final snapshot = await _firestore
         .collection(AppConstants.videosCollection)
-        .orderBy('watchCount', descending: true)
-        .limit(20)
+        .limit(150)
         .get();
 
-    return _filterApprovedVideos(snapshot);
+    final approved = snapshot.docs
+        .map((doc) => VideoModel.fromMap(doc.data(), doc.id))
+        .where((v) => v.moderationStatus == 'approved' || v.isPublic)
+        .toList();
+
+    // Lọc video trong cửa sổ 7 ngày
+    final recentVideos = approved.where((v) => v.timestamp >= sevenDaysAgo).toList();
+
+    final listToRank = recentVideos.isNotEmpty ? recentVideos : approved;
+
+    // Tính điểm thịnh hành 7 ngày: watchCount + likes * 2 + comments * 3 + recency decay
+    listToRank.sort((a, b) {
+      final scoreA = a.watchCount + (a.totalLikes * 2) + (a.totalComments * 3);
+      final scoreB = b.watchCount + (b.totalLikes * 2) + (b.totalComments * 3);
+      return scoreB.compareTo(scoreA);
+    });
+
+    return listToRank.take(20).toList();
   }
 
-  /// Thu thập các hashtag thịnh hành từ 30 video được xem nhiều nhất
+  /// Thu thập các hashtag thịnh hành thực tế từ các video 7 ngày gần nhất
   Future<List<String>> loadTrendingTags() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final sevenDaysAgo = now - (7 * 86400 * 1000);
+
     final snapshot = await _firestore
         .collection(AppConstants.videosCollection)
-        .orderBy('watchCount', descending: true)
-        .limit(30)
+        .limit(100)
         .get();
 
-    final Set<String> uniqueTags = {};
+    final Map<String, int> tagCounts = {};
+
     for (final doc in snapshot.docs) {
       final data = doc.data();
+      final ts = (data['timestamp'] as num?)?.toInt() ?? 0;
+      if (ts < sevenDaysAgo) continue;
+
       final hashtags = data['hashtags'] as List<dynamic>?;
       if (hashtags != null) {
+        final Set<String> seenInDoc = {};
         for (final tag in hashtags) {
-          if (uniqueTags.length < 10) {
-            uniqueTags.add('#${tag.toString().toLowerCase()}');
+          final normTag = TextUtils.normalizeHashtag(tag.toString());
+          if (normTag.isNotEmpty && !seenInDoc.contains(normTag)) {
+            seenInDoc.add(normTag);
+            tagCounts[normTag] = (tagCounts[normTag] ?? 0) + 1;
           }
         }
       }
     }
 
-    // Fallback nếu không có hashtag nào
-    if (uniqueTags.isEmpty) {
-      return ['#trending', '#fyp', '#tiktok'];
+    final sortedEntries = tagCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final result = sortedEntries.map((e) => '#${e.key}').take(10).toList();
+
+    if (result.isEmpty) {
+      return ['#saurien', '#lamdong', '#nongnghiep', '#caphe', '#phantron'];
     }
 
-    return uniqueTags.toList();
-  }
-
-  /// Lọc các video đã được duyệt (không bao gồm rejected hoặc pending)
-  List<VideoModel> _filterApprovedVideos(QuerySnapshot<Map<String, dynamic>> snapshot) {
-    final List<VideoModel> list = [];
-    for (final doc in snapshot.docs) {
-      final model = VideoModel.fromMap(doc.data(), doc.id);
-      if (model.moderationStatus == 'rejected' || model.moderationStatus == 'pending') {
-        continue;
-      }
-      list.add(model);
-    }
-    return list;
+    return result;
   }
 }
