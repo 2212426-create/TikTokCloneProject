@@ -40,7 +40,7 @@ graph TD
 
 ## 🛠️ Công Nghệ & Thư Viện Sử Dụng (Tech Stack)
 
-### 1. 📱 TopTop Mobile App (`TikTokCloneProject`)
+### 1. 📱 App Android native (`apps/mobile-android`, bản cũ)
 Ứng dụng di động native chạy trên nền tảng Android, mang lại trải nghiệm mượt mà, lướt video không độ trễ và hỗ trợ camera quay dựng tiện lợi.
 *   **Ngôn ngữ chính:** Java 17
 *   **Android SDK:** Compile SDK 34, Min SDK 24
@@ -51,7 +51,7 @@ graph TD
 *   **Cơ sở dữ liệu & Authentication:** `Firebase BOM` (Authentication, Cloud Firestore, Realtime Database, Cloud Storage).
 *   **UI Helpers:** `CircleImageView` (Ảnh tròn đại diện), `RecyclerView` (Danh sách cuộn mượt mà), `android-gif-drawable` (Hỗ trợ định dạng ảnh động).
 
-### 2. 💻 TopTop Management Portal (`TikTokManagement`)
+### 2. 💻 Web quản trị (`apps/admin-web`)
 Trang web quản trị tối tân dành cho Admin và Moderator để giám sát, điều phối và bảo vệ cộng đồng người dùng.
 *   **Giao diện & Logic:** `React.js` + `TypeScript` + `Vite` (Khởi chạy cực nhanh).
 *   **Thiết kế & CSS:** `TailwindCSS` với hệ thống màu Dark Mode cao cấp (Glassmorphic UI).
@@ -90,41 +90,36 @@ Trang web quản trị tối tân dành cho Admin và Moderator để giám sát
 
 ## 📁 Cấu Trúc Dự Án (Project Structure)
 
-Thư mục chính chứa hai dự án độc lập nhưng bổ trợ chặt chẽ cho nhau:
+Monorepo chia theo vai trò: `apps/` là các ứng dụng người dùng cuối, `services/` là dịch vụ backend / ML.
 
 ```text
-TopTop/
-├── TikTokCloneProject/         # Mã nguồn ứng dụng di động Android (Java)
-│   ├── app/
-│   │   ├── build.gradle        # Cấu hình thư viện và khóa API của Android
-│   │   └── src/main/
-│   │       ├── AndroidManifest.xml
-│   │       ├── java/com/example/tiktokcloneproject/
-│   │       │   ├── activity/   # 30 màn hình chính (CameraActivity, ChatActivity, EditProfileActivity...)
-│   │       │   ├── adapters/   # Các adapter hiển thị danh sách (VideoAdapter, CommentAdapter...)
-│   │       │   ├── fragment/   # Các tab điều hướng chính (ProfileFragment, SearchFragment, VideoFragment...)
-│   │       │   ├── helper/     # Các công cụ hỗ trợ (GeminiHelper, LegacyHashtagFixer...)
-│   │       │   └── model/      # Định nghĩa thực thể dữ liệu (User, Video, Comment, Chat...)
-│   │       └── res/            # Tài nguyên hình ảnh, bố cục XML layout
-│   └── build.gradle            # Cấu hình Gradle mức dự án
-│
-├── TikTokManagement/           # Mã nguồn Web App quản trị (React + TypeScript)
-│   ├── src/
-│   │   ├── components/         # Các Component dùng chung (layout Sidebar, TopHeader...)
-│   │   ├── pages/              # 6 Màn hình quản lý nghiệp vụ
-│   │   │   ├── Dashboard.tsx   # Trang thống kê, biểu đồ hệ thống
-│   │   │   ├── LoginPage.tsx   # Đăng nhập dành cho quản trị viên
-│   │   │   ├── Moderation.tsx  # Giao diện duyệt / xóa video người dùng
-│   │   │   ├── Reports.tsx     # Xử lý báo cáo vi phạm
-│   │   │   ├── Settings.tsx    # Cài đặt và phân quyền quản trị viên
-│   │   │   └── Users.tsx       # Xem danh sách, tìm kiếm và khóa tài khoản
-│   │   ├── App.tsx             # Điều hướng tab và kiểm tra quyền đăng nhập
-│   │   └── main.tsx            # Điểm khởi chạy của dự án Web
-│   ├── package.json            # Quản lý thư viện dependencies của React
-│   └── vite.config.ts          # Cấu hình Vite bundler
-│
-└── README.md                   # Tài liệu tổng quan này
+ViFarm_App/
+├── apps/
+│   ├── mobile-flutter/          # App ViFarm chính (Flutter): video, chợ nông sản, nhật ký vườn, chat
+│   ├── mobile-android/          # App Android native (Java) — bản cũ trước khi chuyển sang Flutter
+│   │   └── app/src/main/java/com/example/tiktokcloneproject/
+│   │       ├── activity/        # Màn hình (CameraActivity, ChatActivity, EditProfileActivity...)
+│   │       ├── adapters/        # Adapter danh sách (VideoAdapter, CommentAdapter...)
+│   │       ├── fragment/        # Tab điều hướng (ProfileFragment, SearchFragment, VideoFragment...)
+│   │       ├── helper/          # Tiện ích (GeminiHelper, LegacyHashtagFixer...)
+│   │       └── model/           # Thực thể dữ liệu (User, Video, Comment, Chat...)
+│   ├── admin-web/               # Web quản trị (React + TypeScript + Vite)
+│   │   └── src/pages/           # Dashboard, LoginPage, Moderation, Reports, Settings, Users
+│   └── share-page/              # Trang mở video từ link chia sẻ — repo riêng trên GitHub Pages
+│                                #   (HubertPhung/vifarm-share-page), không nằm trong repo này
+├── services/
+│   ├── recsys/                  # Gợi ý video khử thiên lệch (MF, iDCF, IViDR, CDR) + REST API cho app
+│   └── video-fingerprint/       # Worker tạo dấu vân tay video phục vụ kiểm tra bản quyền
+├── firebase/firestore.rules     # Luật bảo mật Firestore
+├── scripts/export_firebase_all.py  # Xuất Firestore / Realtime DB / Auth ra data/firebase_export
+├── docs/                        # Tài liệu chung (kế hoạch bản quyền...)
+├── data/                        # Dữ liệu xuất từ Firebase (bị ignore, không commit)
+└── README.md
 ```
+
+Link chia sẻ video có dạng `https://hubertphung.github.io/vifarm-share-page/?id=<videoId>`; trang
+này mở app bằng `vifarm://open/video/<videoId>` (app Flutter) hoặc `toptop://video/<videoId>`
+(app Android cũ). Link cũ `…/toptop-share-page/?id=…` tự chuyển hướng sang link mới.
 
 ---
 
@@ -151,7 +146,7 @@ Hệ thống lưu trữ trên **Google Cloud Firestore** theo cấu trúc các D
 
 ---
 
-### 2. Thiết lập & Chạy App Android (`TikTokCloneProject`)
+### 2. Thiết lập & Chạy App Android (`apps/mobile-android`)
 
 #### **Yêu cầu hệ thống:**
 *   Android Studio Jellyfish trở lên.
@@ -159,10 +154,10 @@ Hệ thống lưu trữ trên **Google Cloud Firestore** theo cấu trúc các D
 *   Thiết bị Android thật hoặc Máy ảo Android (API level 24+).
 
 #### **Các bước thực hiện:**
-1. Mở Android Studio, chọn **File > Open** và dẫn tới thư mục `TikTokCloneProject`.
+1. Mở Android Studio, chọn **File > Open** và dẫn tới thư mục `apps/mobile-android`.
 2. Tải file cấu hình dịch vụ `google-services.json` từ dự án Firebase của bạn và dán vào thư mục:
-   `TikTokCloneProject/app/`
-3. Tạo một file tên là `local.properties` tại thư mục gốc `TikTokCloneProject/` (nếu chưa có) và thêm cấu hình khóa API Gemini:
+   `apps/mobile-android/app/`
+3. Tạo một file tên là `local.properties` tại thư mục `apps/mobile-android/` (nếu chưa có) và thêm cấu hình khóa API Gemini:
    ```properties
    # Thêm khóa API Gemini cá nhân của bạn để kích hoạt tính năng AI gợi ý Hashtag
    GEMINI_API_KEY=AIzaSy...YourActualGeminiApiKey
@@ -172,7 +167,7 @@ Hệ thống lưu trữ trên **Google Cloud Firestore** theo cấu trúc các D
 
 ---
 
-### 3. Thiết lập & Chạy Web App Quản Trị (`TikTokManagement`)
+### 3. Thiết lập & Chạy Web App Quản Trị (`apps/admin-web`)
 
 #### **Yêu cầu hệ thống:**
 *   Node.js (phiên bản v18 trở lên).
@@ -181,13 +176,13 @@ Hệ thống lưu trữ trên **Google Cloud Firestore** theo cấu trúc các D
 #### **Các bước thực hiện:**
 1. Sử dụng terminal di chuyển vào thư mục dự án Web:
    ```bash
-   cd TikTokManagement
+   cd apps/admin-web
    ```
 2. Cài đặt các thư viện phụ thuộc:
    ```bash
    npm install
    ```
-3. Tạo file `.env` tại thư mục `TikTokManagement/` dựa trên mẫu `.env.example`, điền các khóa cấu hình kết nối Firebase của bạn:
+3. Tạo file `.env` tại thư mục `apps/admin-web/` dựa trên mẫu `.env.example`, điền các khóa cấu hình kết nối Firebase của bạn:
    ```env
    VITE_FIREBASE_API_KEY=AIzaSy...
    VITE_FIREBASE_AUTH_DOMAIN=toptop-project.firebaseapp.com
@@ -201,6 +196,14 @@ Hệ thống lưu trữ trên **Google Cloud Firestore** theo cấu trúc các D
    npm run dev
    ```
 5. Mở trình duyệt web và truy cập địa chỉ được hiển thị trên Terminal (mặc định là `http://localhost:5173`) để sử dụng trang quản trị.
+
+---
+
+### 4. App Flutter (`apps/mobile-flutter`) và dịch vụ gợi ý (`services/recsys`)
+```bash
+cd apps/mobile-flutter && flutter pub get && flutter run
+```
+Dịch vụ gợi ý video: xem [services/recsys/README.md](services/recsys/README.md).
 
 ---
 

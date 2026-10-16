@@ -1,2 +1,0 @@
-# agri-behavioral-recsys package
-
