@@ -25,8 +25,8 @@ export function LoginPage() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-5">
                 <PlaySquare className="w-8 h-8 text-primary" fill="currentColor" />
               </div>
-              <h1 className="font-headline text-3xl font-bold text-on-surface mb-2">TopTop Admin</h1>
-              <p className="text-on-surface-variant font-body text-sm">Hệ thống quản trị nội dung</p>
+              <h1 className="font-headline text-3xl font-bold text-on-surface mb-2">ViFarm Admin</h1>
+              <p className="text-on-surface-variant font-body text-sm">Hệ thống quản trị nội dung & gian hàng ViFarm</p>
             </div>
 
             {/* Role requirement notice */}
@@ -75,7 +75,7 @@ export function LoginPage() {
 
         {/* Bottom branding */}
         <p className="text-center text-on-surface-variant/50 font-label text-xs mt-6">
-          TopTop Management v1.0 · Firebase Authentication
+          ViFarm Management v1.0 · Firebase Authentication
         </p>
       </div>
     </div>

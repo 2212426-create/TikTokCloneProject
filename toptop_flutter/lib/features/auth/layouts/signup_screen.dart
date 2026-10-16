@@ -9,8 +9,7 @@ import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
 
-/// Màn hình đăng ký tài khoản mới
-/// Port từ EmailSignupActivity.java
+/// Màn hình đăng ký tài khoản mới ViFarm
 class SignupScreen extends ConsumerStatefulWidget {
   const SignupScreen({super.key});
 
@@ -50,7 +49,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
 
-    // Hiển thị lỗi nếu có
     ref.listen<AuthState>(authNotifierProvider, (prev, next) {
       if (next.errorMessage != null && next.errorMessage != prev?.errorMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -82,7 +80,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               children: [
                 const SizedBox(height: 32),
 
-                // Logo TopTop
+                // Logo ViFarm
                 Center(
                   child: Container(
                     width: 72,
@@ -106,14 +104,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       borderRadius: BorderRadius.circular(20),
                       child: Image.asset(
                         AppAssets.logo,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Tiêu đề
                 const Text(
                   'Tạo tài khoản',
                   textAlign: TextAlign.center,
@@ -125,7 +122,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Đăng ký để bắt đầu chia sẻ video ngắn',
+                  'Đăng ký để tham gia hệ sinh thái ViFarm',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -135,7 +132,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 const SizedBox(height: 40),
 
-                // Email
                 AuthTextField(
                   controller: _emailController,
                   hintText: 'Email',
@@ -146,7 +142,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 const SizedBox(height: 16),
 
-                // Password
                 AuthTextField(
                   controller: _passwordController,
                   hintText: AppStrings.hintPassword,
@@ -157,7 +152,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 const SizedBox(height: 16),
 
-                // Confirm Password
                 AuthTextField(
                   controller: _confirmPasswordController,
                   hintText: AppStrings.hintConfirm,
@@ -173,7 +167,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 const SizedBox(height: 16),
 
-                // Điều khoản
                 RichText(
                   textAlign: TextAlign.center,
                   text: TextSpan(
@@ -201,14 +194,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const TextSpan(text: ' của chúng tôi.'),
+                      const TextSpan(text: ' của ViFarm.'),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 24),
 
-                // Signup button
                 ElevatedButton(
                   onPressed: authState.isLoading ? null : _handleSignup,
                   child: authState.isLoading
@@ -225,7 +217,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
                 const SizedBox(height: 24),
 
-                // Link to login
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

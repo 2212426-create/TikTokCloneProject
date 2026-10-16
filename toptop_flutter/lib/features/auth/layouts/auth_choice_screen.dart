@@ -8,8 +8,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 
-/// Màn hình chọn phương thức đăng nhập/đăng ký — Premium Design
-/// Port từ MainActivity.java (sign up choice layout) và SigninChoiceActivity.java
+/// Màn hình chọn phương thức đăng nhập/đăng ký ViFarm
 class AuthChoiceScreen extends ConsumerWidget {
   const AuthChoiceScreen({super.key});
 
@@ -87,14 +86,14 @@ class AuthChoiceScreen extends ConsumerWidget {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
-                      child: Image.asset(AppAssets.logo, fit: BoxFit.cover),
+                      child: Image.asset(AppAssets.logo, fit: BoxFit.contain),
                     ),
                   ),
                   const SizedBox(height: 28),
 
                   // Title
                   const Text(
-                    'Đăng nhập vào TopTop',
+                    'Đăng nhập vào ViFarm',
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w800,
@@ -104,7 +103,7 @@ class AuthChoiceScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Quản lý hồ sơ của bạn, xem thông báo,\nthả tim bình luận và tạo nội dung thú vị.',
+                    'Khám phá kỹ thuật nông nghiệp, trao đổi mua bán\nvật tư nông sản & kết nối cộng đồng nhà vườn.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -194,8 +193,6 @@ class AuthChoiceScreen extends ConsumerWidget {
   }
 }
 
-/// A local Google mark. Keeping it in Flutter avoids a network/CORS failure
-/// on the sign-in screen before the user has authenticated.
 class _GoogleLogo extends StatelessWidget {
   const _GoogleLogo();
 
@@ -210,7 +207,6 @@ class _GoogleLogo extends StatelessWidget {
   }
 }
 
-/// Nút chọn phương thức đăng nhập — Premium style
 class _AuthChoiceButton extends StatelessWidget {
   final Widget icon;
   final String label;

@@ -31,9 +31,9 @@ Future<void> main() async {
       ),
     );
 
-    // Chỉ cho phép orientation dọc (giống TikTok)
+    // Chỉ cho phép orientation dọc
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   }
 
-  runApp(const ProviderScope(child: TopTopApp()));
+  runApp(const ProviderScope(child: ViFarmApp()));
 }

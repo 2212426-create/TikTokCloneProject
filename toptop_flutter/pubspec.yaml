@@ -1,5 +1,5 @@
 name: toptop_flutter
-description: "TopTop - TikTok Clone Flutter App"
+description: "ViFarm - Agricultural Video & Commerce Ecosystem"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -47,11 +47,11 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
-  image_path: "assets/images/toptoplogo.png"
+  image_path: "assets/images/vifarm.png"
   remove_alpha_ios: true
   web:
     generate: true
-    image_path: "assets/images/toptoplogo.png"
+    image_path: "assets/images/vifarm.png"
     background_color: "#121212"
     theme_color: "#121212"
 
