@@ -1,25 +1,22 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_constants.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/validators.dart';
 
-/// Màn hình Xóa tài khoản
-/// Port từ DeleteAccountActivity.java và SignInToDeleteActivity.java trong Android project
-class DeleteAccountScreen extends StatefulWidget {
+import '../../../core/theme/app_theme.dart';
+import '../../auth/providers/auth_provider.dart';
+
+/// Màn hình Xóa tài khoản vĩnh viễn
+class DeleteAccountScreen extends ConsumerStatefulWidget {
   const DeleteAccountScreen({super.key});
 
   @override
-  State<DeleteAccountScreen> createState() => _DeleteAccountScreenState();
+  ConsumerState<DeleteAccountScreen> createState() => _DeleteAccountScreenState();
 }
 
-class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _passwordController = TextEditingController();
+class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isConfirmChecked = false;
   bool _isLoading = false;
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -27,79 +24,35 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     super.dispose();
   }
 
-  /// Thực hiện xóa tài khoản hoàn toàn
-  Future<void> _deleteAccount() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _handleDeleteAccount() async {
+    if (!_isConfirmChecked) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null || user.email == null) {
-        throw Exception('Không tìm thấy thông tin phiên đăng nhập.');
-      }
+      final notifier = ref.read(authNotifierProvider.notifier);
+      final success = await notifier.deleteAccount(_passwordController.text);
 
-      // 1. Re-authenticate để đảm bảo session mới (tránh lỗi requires-recent-login của Firebase)
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: _passwordController.text,
-      );
-      await user.reauthenticateWithCredential(credential);
-
-      final uid = user.uid;
-
-      // 2. Xóa dữ liệu người dùng trong Firestore để giữ db sạch sẽ
-      await FirebaseFirestore.instance
-          .collection(AppConstants.usersCollection)
-          .doc(uid)
-          .delete();
-      await FirebaseFirestore.instance
-          .collection(AppConstants.profilesCollection)
-          .doc(uid)
-          .delete();
-
-      // 3. Xóa tài khoản trên Firebase Auth
-      await user.delete();
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
+      if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Tài khoản của bạn đã được xóa thành công.'),
-            duration: Duration(seconds: 3),
+            content: Text('Tài khoản đã được xóa vĩnh viễn khỏi hệ thống ViFarm.'),
+            backgroundColor: Colors.green,
           ),
         );
-
-        // Chuyển hướng về màn hình đăng nhập chính
         context.go('/auth');
       }
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      String errorMsg = 'Xóa tài khoản thất bại.';
-      if (e.code == 'wrong-password') {
-        errorMsg = 'Mật khẩu xác nhận không chính xác.';
-      } else {
-        errorMsg = 'Lỗi xóa tài khoản: ${e.message}';
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMsg)),
-      );
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi xóa tài khoản: ${e.toString()}'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -108,103 +61,96 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Xóa tài khoản',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
+        title: const Text('Xóa tài khoản'),
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFE2C55)),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.redAccent,
+                size: 64,
               ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Color(0xFFFE2C55),
-                      size: 72,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Bạn có chắc chắn muốn xóa tài khoản?',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Hành động này không thể hoàn tác. Khi xóa tài khoản:\n'
-                      '• Thông tin cá nhân và cài đặt của bạn sẽ bị hủy bỏ.\n'
-                      '• Bạn sẽ không thể truy cập lại dữ liệu của tài khoản này.\n'
-                      '• Các video đã đăng của bạn sẽ không còn hiển thị trên bảng tin công cộng.',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(color: Colors.white),
-                      validator: Validators.validatePassword,
-                      decoration: InputDecoration(
-                        hintText: 'Nhập mật khẩu để xác nhận',
-                        hintStyle: const TextStyle(color: AppTheme.textHint),
-                        filled: true,
-                        fillColor: const Color(0xFF2C2C2E),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                            color: AppTheme.textHint,
-                          ),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFE2C55),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
+              const SizedBox(height: 16),
+
+              const Text(
+                'Xóa tài khoản ViFarm',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+
+              Text(
+                'Hành động này không thể hoàn tác. Khi xóa tài khoản, tất cả video, nhật ký mùa vụ, sản phẩm và lịch sử giao dịch sẽ bị xóa vĩnh viễn.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 32),
+
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Xác nhận mật khẩu',
+                  labelStyle: const TextStyle(color: Colors.grey),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Colors.grey),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppTheme.primaryColor),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                activeColor: Colors.redAccent,
+                title: const Text(
+                  'Tôi hiểu rằng toàn bộ dữ liệu sẽ bị xóa và không thể khôi phục.',
+                  style: TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                value: _isConfirmChecked,
+                onChanged: (val) {
+                  setState(() => _isConfirmChecked = val ?? false);
+                },
+              ),
+
+              const Spacer(),
+
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: (_isConfirmChecked && !_isLoading)
+                    ? () {
                         showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
                             backgroundColor: const Color(0xFF1E1E1E),
                             title: const Text('Xác nhận xóa vĩnh viễn', style: TextStyle(color: Colors.white)),
                             content: const Text(
-                              'Bạn có thực sự muốn xóa vĩnh viễn tài khoản TopTop này? Tất cả dữ liệu sẽ biến mất.',
+                              'Bạn có thực sự muốn xóa vĩnh viễn tài khoản ViFarm này? Tất cả dữ liệu sẽ biến mất.',
                               style: TextStyle(color: AppTheme.textSecondary),
                             ),
                             actions: [
@@ -214,31 +160,27 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                               ),
                               ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFE2C55),
+                                  backgroundColor: Colors.redAccent,
                                 ),
                                 onPressed: () {
-                                  Navigator.pop(context); // Đóng popup xác nhận
-                                  _deleteAccount(); // Thực hiện xóa
+                                  Navigator.pop(context);
+                                  _handleDeleteAccount();
                                 },
-                                child: const Text('Xóa ngay', style: TextStyle(color: Colors.white)),
+                                child: const Text('Xóa ngay'),
                               ),
                             ],
                           ),
                         );
-                      },
-                      child: const Text(
-                        'Xóa tài khoản',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                      }
+                    : null,
+                child: _isLoading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Xóa tài khoản vĩnh viễn', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

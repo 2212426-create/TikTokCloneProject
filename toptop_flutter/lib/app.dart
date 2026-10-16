@@ -7,16 +7,16 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/chat/providers/chat_provider.dart';
 
-/// Widget gốc của ứng dụng TopTop
+/// Widget gốc của ứng dụng ViFarm
 /// Cấu hình Material 3 theme, GoRouter, và quản lý Presence người dùng
-class TopTopApp extends ConsumerStatefulWidget {
-  const TopTopApp({super.key});
+class ViFarmApp extends ConsumerStatefulWidget {
+  const ViFarmApp({super.key});
 
   @override
-  ConsumerState<TopTopApp> createState() => _TopTopAppState();
+  ConsumerState<ViFarmApp> createState() => _ViFarmAppState();
 }
 
-class _TopTopAppState extends ConsumerState<TopTopApp>
+class _ViFarmAppState extends ConsumerState<ViFarmApp>
     with WidgetsBindingObserver {
   @override
   void initState() {
@@ -56,7 +56,7 @@ class _TopTopAppState extends ConsumerState<TopTopApp>
     ref.watch(currentUserPresenceProvider);
 
     return MaterialApp.router(
-      title: 'TopTop',
+      title: 'ViFarm',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -65,8 +65,6 @@ class _TopTopAppState extends ConsumerState<TopTopApp>
       builder: (context, child) {
         if (!kIsWeb || child == null) return child ?? const SizedBox.shrink();
 
-        // The browser version intentionally keeps the vertical, phone-first
-        // TikTok experience while remaining comfortable on wide displays.
         return ColoredBox(
           color: Theme.of(context).scaffoldBackgroundColor,
           child: Center(

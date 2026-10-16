@@ -78,7 +78,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   }
 
   return GoRouter(
-    initialLocation: '/home',
+    initialLocation: '/', // Đổi về '/' để SplashScreen luôn được mount khi ứng dụng khởi động
     debugLogDiagnostics: true,
 
     redirect: (context, state) {
@@ -86,8 +86,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoading = authState.isLoading;
       final currentPath = state.uri.path;
 
+      if (currentPath == '/') return null; // Giữ nguyên '/' để SplashScreen thực thi animation
       if (isLoading) return null;
-      if (currentPath == '/') return null;
 
       final isAuthRoute = currentPath.startsWith('/auth');
 

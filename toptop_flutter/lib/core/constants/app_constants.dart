@@ -1,9 +1,9 @@
-/// Hằng số toàn cục cho ứng dụng TopTop
+/// Hằng số toàn cục cho ứng dụng ViFarm
 class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'TopTop';
+  static const String appName = 'ViFarm';
   static const String appVersion = '1.0.0';
 
   // Firebase Realtime Database URL
@@ -43,7 +43,7 @@ class AppConstants {
   static const int videoFeedLimit = 50;
 
   // Splash
-  static const int splashDurationMs = 2000;
+  static const int splashDurationMs = 1200;
 
   // Google Colab RecSys API (Cloudflare Tunnel URL)
   static const String recSysApiUrl = String.fromEnvironment(
