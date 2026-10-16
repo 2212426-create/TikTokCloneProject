@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>TopTop</string>
+	<string>ViFarm</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>TopTop</string>
+	<string>ViFarm</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -40,11 +40,11 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>TopTop cần truy cập camera để quay video mới.</string>
+	<string>ViFarm cần truy cập camera để quay video mới.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>TopTop cần truy cập micro để ghi âm khi quay video.</string>
+	<string>ViFarm cần truy cập micro để ghi âm khi quay video.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>TopTop cần truy cập thư viện ảnh để chọn video và ảnh đại diện.</string>
+	<string>ViFarm cần truy cập thư viện ảnh để chọn video, sản phẩm và ảnh đại diện.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

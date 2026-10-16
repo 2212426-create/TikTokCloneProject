@@ -9,8 +9,7 @@ import '../../../core/utils/validators.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
 
-/// Màn hình đăng nhập bằng email
-/// Port từ EmailLogInActivity.java
+/// Màn hình đăng nhập bằng email ViFarm
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -48,7 +47,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authNotifierProvider);
 
-    // Hiển thị lỗi nếu có
     ref.listen<AuthState>(authNotifierProvider, (prev, next) {
       if (next.errorMessage != null && next.errorMessage != prev?.errorMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const SizedBox(height: 32),
 
-                // Logo TopTop
+                // Logo ViFarm
                 Center(
                   child: Container(
                     width: 72,
@@ -104,14 +102,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       borderRadius: BorderRadius.circular(20),
                       child: Image.asset(
                         AppAssets.logo,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // Tiêu đề
                 const Text(
                   'Chào mừng trở lại!',
                   textAlign: TextAlign.center,
@@ -124,7 +121,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Đăng nhập để tiếp tục sử dụng TopTop',
+                  'Đăng nhập để tiếp tục sử dụng ViFarm',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
@@ -134,7 +131,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 40),
 
-                // Email
                 AuthTextField(
                   controller: _emailController,
                   hintText: 'Email',
@@ -145,7 +141,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 16),
 
-                // Password
                 AuthTextField(
                   controller: _passwordController,
                   hintText: AppStrings.hintPassword,
@@ -158,7 +153,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 32),
 
-                // Login button với gradient
                 Container(
                   width: double.infinity,
                   height: 52,
@@ -205,7 +199,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 28),
 
-                // Divider "hoặc"
                 Row(
                   children: [
                     Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1))),
@@ -225,7 +218,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: 20),
 
-                // Link to signup
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

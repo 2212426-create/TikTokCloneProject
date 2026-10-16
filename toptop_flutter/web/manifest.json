@@ -1,11 +1,11 @@
 {
-    "name": "TopTop",
-    "short_name": "TopTop",
+    "name": "ViFarm",
+    "short_name": "ViFarm",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#121212",
     "theme_color": "#121212",
-    "description": "A new Flutter project.",
+    "description": "ViFarm - Mạng xã hội video ngắn & Thương mại nông nghiệp.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

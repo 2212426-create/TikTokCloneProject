@@ -1,5 +1,3 @@
-// ignore_for_file: prefer_initializing_formals
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -9,8 +7,7 @@ import '../../../core/constants/app_constants.dart';
 import '../models/profile_model.dart';
 import '../models/user_model.dart';
 
-/// Repository xử lý logic xác thực và quản lý user/profile
-/// Port từ EmailSignupActivity.java, EmailLogInActivity.java
+/// Repository xử lý logic xác thực và quản lý user/profile ViFarm
 class AuthRepository {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -21,19 +18,14 @@ class AuthRepository {
   }) : _auth = auth,
        _firestore = firestore;
 
-  /// Người dùng hiện tại
   User? get currentUser => _auth.currentUser;
 
-  /// Stream trạng thái đăng nhập
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  /// Đăng ký tài khoản mới bằng email + password
-  /// Port từ EmailSignupActivity.setupUserDataAndProfile()
   Future<User> signUpWithEmail({
     required String email,
     required String password,
   }) async {
-    // Tạo tài khoản Firebase Auth
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -44,14 +36,12 @@ class AuthRepository {
       throw Exception('Lỗi xác thực người dùng mới.');
     }
 
-    // Tạo username từ email handle
     String username = email.split('@')[0];
     username = username.replaceAll(RegExp(r'[^a-zA-Z0-9_.]'), '');
     if (username.isEmpty) {
       username = 'user_${user.uid.substring(0, 5)}';
     }
 
-    // Tạo document trong collection "users"
     final userModel = UserModel(
       userId: user.uid,
       username: username,
@@ -63,11 +53,11 @@ class AuthRepository {
         .doc(user.uid)
         .set(userModel.toMap());
 
-    // Tạo document trong collection "profiles"
     final profileModel = ProfileModel(
       userId: user.uid,
       username: username,
       fullname: username,
+      bio: 'Thành viên ViFarm',
     );
 
     await _firestore
@@ -78,8 +68,6 @@ class AuthRepository {
     return user;
   }
 
-  /// Đăng nhập bằng email + password
-  /// Port từ EmailLogInActivity.loginUserAccount()
   Future<User> signInWithEmail({
     required String email,
     required String password,
@@ -97,8 +85,6 @@ class AuthRepository {
     return user;
   }
 
-  /// Đăng nhập bằng Google Account
-  /// Port từ EmailSignInActivity.java
   Future<User?> signInWithGoogle() async {
     late User user;
     late String displayName;
@@ -106,9 +92,6 @@ class AuthRepository {
     late String photoUrl;
 
     if (kIsWeb) {
-      // Firebase owns the browser OAuth flow. This avoids coupling Web to an
-      // Android-generated client ID in index.html and uses Firebase's
-      // authorized-domain configuration instead.
       final provider = GoogleAuthProvider()
         ..setCustomParameters({'prompt': 'select_account'});
       final credential = await _auth.signInWithPopup(provider);
@@ -117,7 +100,6 @@ class AuthRepository {
       email = user.email ?? '';
       photoUrl = user.photoURL ?? '';
     } else {
-      // Android and iOS use the native Google account chooser.
       final googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) return null;
 
@@ -137,7 +119,6 @@ class AuthRepository {
       photoUrl = googleUser.photoUrl ?? '';
     }
 
-    // 4. Kiểm tra xem user document đã tồn tại trên Firestore chưa
     final userDocRef = _firestore
         .collection(AppConstants.usersCollection)
         .doc(user.uid);
@@ -147,11 +128,9 @@ class AuthRepository {
     if (username.isEmpty) {
       username = 'user_${user.uid.substring(0, 5)}';
     }
-    // Loại bỏ ký tự đặc biệt để làm username hợp lệ
     username = username.replaceAll(RegExp(r'[^a-zA-Z0-9_.]'), '');
 
     if (!userDoc.exists) {
-      // Tạo bản ghi mới nếu chưa có
       final userData = {
         'userId': user.uid,
         'username': username,
@@ -165,7 +144,6 @@ class AuthRepository {
       };
       await userDocRef.set(userData);
     } else {
-      // Nếu tài khoản đã tồn tại, kiểm tra xem có bị khóa (banned) hay không
       final status = userDoc.data()?['status'] as String?;
       if (status == 'banned') {
         await signOut();
@@ -175,7 +153,6 @@ class AuthRepository {
       }
     }
 
-    // 5. Kiểm tra hồ sơ (profile) đã tồn tại chưa
     final profileDocRef = _firestore
         .collection(AppConstants.profilesCollection)
         .doc(user.uid);
@@ -188,7 +165,7 @@ class AuthRepository {
         'username': username,
         'fullname': displayName.isNotEmpty ? displayName : username,
         'avatar': photoUrl,
-        'bio': 'Toptop user',
+        'bio': 'Thành viên ViFarm',
         'followers': 0,
         'following': 0,
         'likes': 0,
@@ -200,12 +177,19 @@ class AuthRepository {
     return user;
   }
 
-  /// Đăng xuất
   Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  /// Lấy thông tin user từ Firestore
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await _firestore.collection(AppConstants.usersCollection).doc(user.uid).delete();
+      await _firestore.collection(AppConstants.profilesCollection).doc(user.uid).delete();
+      await user.delete();
+    }
+  }
+
   Future<UserModel?> getUserData(String uid) async {
     final doc = await _firestore
         .collection(AppConstants.usersCollection)
@@ -216,7 +200,6 @@ class AuthRepository {
     return UserModel.fromMap(doc.data()!);
   }
 
-  /// Lấy thông tin profile từ Firestore
   Future<ProfileModel?> getProfile(String uid) async {
     final doc = await _firestore
         .collection(AppConstants.profilesCollection)
@@ -227,8 +210,6 @@ class AuthRepository {
     return ProfileModel.fromMap(doc.data()!);
   }
 
-  /// Stream theo dõi trạng thái user (kiểm tra banned)
-  /// Port từ HomeScreenActivity.onStart() listener
   Stream<UserModel?> watchUserStatus(String uid) {
     return _firestore
         .collection(AppConstants.usersCollection)

@@ -57,7 +57,7 @@ class AuthState {
   }
 }
 
-/// Notifier xử lý các hành động xác thực (đăng nhập, đăng ký, đăng xuất)
+/// Notifier xử lý các hành động xác thực (đăng nhập, đăng ký, đăng xuất, xóa tài khoản)
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
 
@@ -140,6 +140,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _repository.signOut();
   }
 
+  /// Xóa tài khoản
+  Future<bool> deleteAccount(String password) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _repository.deleteAccount();
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'Xóa tài khoản thất bại: ${e.toString()}',
+      );
+      return false;
+    }
+  }
+
   /// Xóa thông báo lỗi
   void clearError() {
     state = state.copyWith(errorMessage: null);
@@ -157,7 +173,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       case 'user-not-found':
         return 'Không tìm thấy tài khoản với email này.';
       case 'wrong-password':
-      case 'invalid-credential': // Firebase SDK >= 10
+      case 'invalid-credential':
         return 'Email hoặc mật khẩu không đúng.';
       case 'user-disabled':
         return 'Tài khoản đã bị vô hiệu hóa.';

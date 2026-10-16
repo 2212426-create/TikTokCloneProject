@@ -1,192 +1,146 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../auth/providers/auth_provider.dart';
-import '../../../core/providers/theme_provider.dart';
 
-/// Màn hình Cài đặt & Quyền riêng tư
-/// Port từ SettingsAndPrivacyActivity.java trong Android project
+import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../auth/providers/auth_provider.dart';
+
+/// Màn hình Cài đặt & Quyền riêng tư (Settings Screen)
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  String _getThemeLabel(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.light:
-        return '☀️ Sáng';
-      case ThemeMode.dark:
-        return '🌙 Tối';
-      case ThemeMode.system:
-        return '⚙️ Hệ thống';
-    }
-  }
-
-
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentUid = ref.watch(authStateProvider).valueOrNull?.uid;
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hintColor = isDark ? AppTheme.textHint : Colors.grey[600];
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bgColor = theme.scaffoldBackgroundColor;
+    final cardColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
+    final textColor = theme.colorScheme.onSurface;
+    final hintColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
+
+    final currentUid = ref.watch(currentUserProvider)?.uid ?? '';
 
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Cài đặt và quyền riêng tư',
-          style: TextStyle(
-            color: onSurface,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
+        title: const Text('Cài đặt & Quyền riêng tư'),
       ),
       body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
-          // Section: Tài khoản
-          _buildSectionHeader('TÀI KHOẢN', hintColor),
-          const SizedBox(height: 8),
-          _buildCard(context, [
-            _buildSettingTile(
-              icon: Icons.person_outline_rounded,
-              title: 'Tài khoản',
-              iconColor: onSurface,
-              titleColor: onSurface,
-              hintColor: hintColor,
-              onTap: () => context.push('/settings/account'),
-            ),
-            Divider(height: 1, color: isDark ? const Color(0xFF333333) : const Color(0xFFE8E8E8)),
-            _buildSettingTile(
-              icon: Icons.share_outlined,
-              title: 'Chia sẻ hồ sơ',
-              iconColor: onSurface,
-              titleColor: onSurface,
-              hintColor: hintColor,
-              onTap: () {
-                if (currentUid != null) {
-                  final link = 'http://toptoptoptop.com/$currentUid';
-                  Clipboard.setData(ClipboardData(text: link)).then((_) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Đã sao chép liên kết hồ sơ của bạn!'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  });
-                }
-              },
-            ),
-          ]),
+          _buildSectionHeader('Tài khoản'),
+          _buildSettingsTile(
+            context,
+            icon: Icons.person_outline,
+            title: 'Cài đặt tài khoản',
+            subtitle: 'Thông tin cá nhân & quản lý tài khoản',
+            cardColor: cardColor,
+            textColor: textColor,
+            hintColor: hintColor,
+            onTap: () => context.push('/settings/account'),
+          ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Section: Hiển thị
-          _buildSectionHeader('HIỂN THỊ', hintColor),
-          const SizedBox(height: 8),
-          _buildCard(context, [
-            _buildSettingTile(
-              icon: Icons.dark_mode_outlined,
-              title: 'Giao diện',
-              subtitle: _getThemeLabel(ref.watch(themeNotifierProvider)),
-              iconColor: onSurface,
-              titleColor: onSurface,
-              hintColor: hintColor,
-              onTap: () => context.push('/settings/appearance'),
+          _buildSectionHeader('Cài đặt ứng dụng'),
+          _buildSettingsTile(
+            context,
+            icon: Icons.palette_outlined,
+            title: 'Giao diện hiển thị',
+            subtitle: 'Chế độ Sáng / Tối',
+            cardColor: cardColor,
+            textColor: textColor,
+            hintColor: hintColor,
+            onTap: () => context.push('/settings/appearance'),
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildSectionHeader('Thông tin & Hỗ trợ'),
+          _buildSettingsTile(
+            context,
+            icon: Icons.info_outline,
+            title: 'Về ViFarm',
+            subtitle: 'Phiên bản ${AppConstants.appVersion}',
+            cardColor: cardColor,
+            textColor: textColor,
+            hintColor: hintColor,
+            showChevron: false,
+            onTap: () {},
+          ),
+
+          const SizedBox(height: 32),
+
+          // Nút Đăng xuất
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? const Color(0xFF242428) : const Color(0xFFF1F1F3),
+              foregroundColor: AppTheme.primaryColor,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-          ]),
-
-          const SizedBox(height: 20),
-
-          // Section: Đăng xuất
-          _buildSectionHeader('ĐĂNG XUẤT', hintColor),
-          const SizedBox(height: 8),
-          _buildCard(context, [
-            _buildSettingTile(
-              icon: Icons.logout_rounded,
-              title: 'Đăng xuất',
-              iconColor: const Color(0xFFFE2C55),
-              titleColor: const Color(0xFFFE2C55),
-              hintColor: hintColor,
-              isBold: true,
-              showChevron: false,
-              onTap: () {
-                _showLogoutDialog(context, ref, isDark);
-              },
+            onPressed: () => _showLogoutDialog(context, ref, isDark),
+            child: const Text(
+              'Đăng xuất',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
             ),
-          ]),
+          ),
           const SizedBox(height: 32),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, Color? color) {
+  Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 4),
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
-        title,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
           fontWeight: FontWeight.bold,
-          letterSpacing: 1.0,
+          color: AppColors.primary,
+          letterSpacing: 0.8,
         ),
       ),
     );
   }
 
-  Widget _buildCard(BuildContext context, List<Widget> children) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.06) : const Color(0xFFE8E8E8),
-        ),
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _buildSettingTile({
+  Widget _buildSettingsTile(
+    BuildContext context, {
     required IconData icon,
     required String title,
-    String? subtitle,
-    required Color iconColor,
-    required Color titleColor,
-    Color? hintColor,
-    bool isBold = false,
-    bool showChevron = true,
+    required String subtitle,
+    required Color cardColor,
+    required Color textColor,
+    required Color hintColor,
     required VoidCallback onTap,
+    bool showChevron = true,
   }) {
-    return Material(
-      color: Colors.transparent,
+    return Card(
+      color: cardColor,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        leading: Icon(icon, color: iconColor, size: 22),
+        leading: Icon(icon, color: textColor, size: 22),
         title: Text(
           title,
-          style: TextStyle(
-            color: titleColor,
-            fontSize: 15,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-          ),
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14),
         ),
-        subtitle: subtitle != null
-            ? Text(subtitle, style: TextStyle(color: hintColor, fontSize: 12))
-            : null,
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: hintColor, fontSize: 12),
+        ),
         trailing: showChevron ? Icon(Icons.chevron_right, color: hintColor, size: 20) : null,
         onTap: onTap,
       ),
@@ -199,7 +153,7 @@ class SettingsScreen extends ConsumerWidget {
       builder: (context) => AlertDialog(
         title: const Text('Đăng xuất'),
         content: Text(
-          'Bạn có chắc chắn muốn đăng xuất khỏi TopTop?',
+          'Bạn có chắc chắn muốn đăng xuất khỏi ViFarm?',
           style: TextStyle(color: isDark ? AppTheme.textSecondary : Colors.black87),
         ),
         actions: [
@@ -207,29 +161,18 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () => Navigator.pop(context),
             child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
           ),
-          Container(
-            decoration: BoxDecoration(
-              gradient: AppTheme.brandGradient,
-              borderRadius: BorderRadius.circular(8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
             ),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                ref.read(authRepositoryProvider).signOut().then((_) {
-                  if (context.mounted) {
-                    context.go('/auth');
-                  }
-                });
-              },
-              child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
-            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(authNotifierProvider.notifier).signOut();
+              if (context.mounted) {
+                context.go('/auth');
+              }
+            },
+            child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

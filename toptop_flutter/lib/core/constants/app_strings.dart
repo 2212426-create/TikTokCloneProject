@@ -1,9 +1,8 @@
-/// Hằng số chuỗi văn bản cho ứng dụng TopTop
-/// Được ánh xạ từ strings.xml của TikTokCloneProject
+/// Hằng số chuỗi văn bản cho ứng dụng ViFarm
 class AppStrings {
   AppStrings._();
 
-  static const String appName = 'TopTop';
+  static const String appName = 'ViFarm';
 
   // Login / Register / Auth
   static const String hintPassword = 'Enter your password';
