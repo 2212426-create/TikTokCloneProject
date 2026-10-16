@@ -1,0 +1,8 @@
+torch>=2.0.0
+numpy>=1.22.0
+scipy>=1.8.0
+pandas>=1.4.0
+# RecSys API (src/api)
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27

@@ -36,7 +36,6 @@ TikTokManagement/.env
 
 # Custom redirect page repo
 toptop-share-page/
-agri-behavioral-recsys/
 
 # Flutter specific ignores
 toptop_flutter/.dart_tool/
