@@ -24,30 +24,34 @@ CLAUDE.md
 .agents/
 skills-lock.json
 
-# Subproject specific ignores (fallback)
-TikTokCloneProject/local.properties
-TikTokCloneProject/.gradle/
-TikTokCloneProject/build/
-TikTokCloneProject/app/build/
+# Build / tool output (every subproject)
+**/node_modules/
+**/.gradle/
+**/local.properties
+graphify-out/cache/
+**/graphify-out/cache/
 
-TikTokManagement/node_modules/
-TikTokManagement/dist/
-TikTokManagement/.env
+# Subproject specific ignores
+apps/mobile-android/build/
+apps/mobile-android/app/build/
 
-# Custom redirect page repo
-toptop-share-page/
+apps/admin-web/node_modules/
+apps/admin-web/dist/
+apps/admin-web/.env
+
+# Share page: separate repo deployed to GitHub Pages (HubertPhung/vifarm-share-page)
+apps/share-page/
 
 # Flutter specific ignores
-toptop_flutter/.dart_tool/
-toptop_flutter/.flutter-plugins
-toptop_flutter/.flutter-plugins-dependencies
-toptop_flutter/.pub-cache/
-toptop_flutter/.pub/
-toptop_flutter/build/
-toptop_flutter/android/local.properties
-toptop_flutter/android/key.properties
-toptop_flutter/ios/Flutter/Generated.xcconfig
-toptop_flutter/ios/Flutter/flutter_export_environment.sh
+apps/mobile-flutter/.dart_tool/
+apps/mobile-flutter/.flutter-plugins
+apps/mobile-flutter/.flutter-plugins-dependencies
+apps/mobile-flutter/.pub-cache/
+apps/mobile-flutter/.pub/
+apps/mobile-flutter/build/
+apps/mobile-flutter/android/key.properties
+apps/mobile-flutter/ios/Flutter/Generated.xcconfig
+apps/mobile-flutter/ios/Flutter/flutter_export_environment.sh
 
 # Firebase Private Keys and Database Exports
 serviceAccountKey.json
